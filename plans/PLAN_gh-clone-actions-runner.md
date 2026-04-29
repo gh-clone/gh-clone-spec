@@ -1,46 +1,4 @@
-## 4. THE COMPUTATIONAL ROADMAP & SEARCH ENGINE
-
-### Tier 1: Identity & The Zanzibar Graph (GitHub AuthZ)
-- [ ] Define protobuf schema for `RelationTuple` (`namespace`, `object_id`, `relation`, `subject_namespace`, `subject_id`).
-- [ ] Create Postgres migrations for the master tuple store using composite primary keys to guarantee uniqueness and enable prefix scanning.
-- [ ] Implement Spanner-style read-write transactions using snapshot isolation to guarantee linearizability for tuple inserts/deletes.
-- [ ] Define the Namespace Configuration Language (NCL) parser to load and compile AuthZ rules (e.g., `viewer = owner + team_member`).
-- [ ] Implement the `Check` API gRPC endpoint to evaluate binary authorization questions (`user:X can push to repo:Y?`).
-- [ ] Implement the `Read` API for fetching direct relationships and their corresponding consistency tokens.
-- [ ] Implement the `Expand` API to return a structural tree of all paths proving (or disproving) access.
-- [ ] Build the `Check` Engine's concurrent Breadth-First Search (BFS) graph traversal mechanism.
-- [ ] Implement bounded-depth graph cycle detection in the BFS traversal algorithm to prevent infinite loops on recursive group structures.
-- [ ] Create a multi-tier caching strategy using L1 memory (local to AuthZ node) and L2 Redis (distributed edge cache).
-- [ ] Encode "Zookies" (consistency tokens) as base64url encoded protobufs containing the Hybrid Logical Clock (HLC) timestamp.
-- [ ] Implement Zookie validation logic: determine if a read can safely hit the cache or if it must query the master database to respect read-after-write.
-- [ ] Implement the Leopard index mapping subjects to bitsets of all directly and indirectly accessible objects.
-- [ ] Implement SIMD-optimized bitset intersections for fast `ListObjects` queries.
-- [ ] Deploy a Debezium connector on Postgres to capture tuple mutations via logical decoding.
-- [ ] Route Debezium Change Data Capture (CDC) events into a Kafka `acl-events` stream.
-- [ ] Build a Rust cache-invalidation worker consuming `acl-events` to selectively drop or update Redis keys.
-- [ ] Implement request hedging (sending duplicated read requests to multiple replicas after a short timeout) to guarantee 99th percentile latency targets (<1ms).
-- [ ] Implement a distributed rate-limiter based on the Token Bucket algorithm specifically for the AuthZ API tier.
-
-### Tier 2: Version Control Storage & Code Search (Spokes & Blackbird)
-- [ ] Define the Spokes internal gRPC interface (`Fetch`, `Push`, `UpdateRef`, `Checksum`).
-- [ ] Implement a Raft state machine in Rust for Git replica consensus, managing leader election across storage racks.
-- [ ] Configure HAProxy edge proxies to intelligently route Git-over-SSH and Git-over-HTTPS to the active Spokes primary node.
-- [ ] Implement a distributed Git reference-locking mechanism (via Redis/ZooKeeper) to prevent concurrent push race conditions.
-- [ ] Write a specialized `.pack` file parser in Rust to extract and validate commits during the push receive-pack phase.
-- [ ] Implement a 3-way merge algorithm using `libgit2` in-memory.
-- [ ] Build a memory-arena allocator for the merge engine to handle large AST diffing without runtime Garbage Collection pauses.
-- [ ] Implement strict conflict marker (`<<<<<<< HEAD`) detection during the virtual tree traversal.
-- [ ] Create an asynchronous background task queue to compute and cache Pull Request diffs using the Patience/Histogram diff algorithm.
-- [ ] Build the Blackbird indexer daemon: A Rust worker permanently tailing the Kafka `push` topic.
-- [ ] Integrate `tree-sitter` grammars into the indexer for the top 10 languages (C, C++, JS, Python, Go, Rust, Ruby, Java, TS, PHP).
-- [ ] Extract semantic symbol definitions (classes, functions, constants) by executing compiled tree-sitter queries against file blobs.
-- [ ] Generate byte-level sparse trigrams from source code documents to power structural regex matching.
-- [ ] Construct Finite State Transducers (FSTs) to map incoming regex queries into their optimal trigram intersection paths.
-- [ ] Implement a query planner to intersect trigram FSTs and filter file candidates *before* executing full `hyperscan` regex engines.
-- [ ] Implement a document scoring algorithm based on the PageRank of intra-repository import/dependency graphs.
-- [ ] Store tokenized code chunks in an LSM-tree (RocksDB) partitioned efficiently by repository ID.
-- [ ] Implement incremental code indexing: only hash, parse, and index the specific blobs that changed in a given commit.
-- [ ] Expose an internal gRPC search endpoint that scatter-gathers user queries across the sharded Blackbird cluster and aggregates results.
+# Plan for gh-clone-actions-runner
 
 ### Tier 3: GitHub Actions Control Plane & Runner Isolation
 
@@ -167,4 +125,5 @@
 - [ ] **Health Checks:** Implement polling routines evaluating the `HEALTHCHECK` status of service containers before allowing workflow steps to proceed.
 - [ ] **Permissions Mapping:** Dynamically inject `USER` and map the host UID/GID to the container user to prevent root-owned artifact creation.
 - [ ] **Network Isolation:** Provision a unique `docker network create` per workflow execution to prevent parallel workflows on the same host from sniffing traffic.
-- [ ] **Cleanup:** Rely on `libmountsandbox` bounded execution contexts and timeout polling to rigidly enforce cleanup of orphan containers and resources upon exit.
+- [ ] **Cleanup:** Rely on `libmountsandbox` bounded execution contexts and timeout polling to rigidly enforce cleanup of orphan containers and resources upon exit.## 5. OMNI-PLATFORM DEPLOYMENT & PACKAGING DEEP DIVE
+

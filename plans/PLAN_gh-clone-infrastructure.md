@@ -1,4 +1,4 @@
-## 5. OMNI-PLATFORM DEPLOYMENT & PACKAGING DEEP DIVE
+# Plan for gh-clone-infrastructure
 
 ### 5.1 Virtual Appliance Build & Base OS (Packer)
 - [ ] **AWS AMI Generation:** Develop HashiCorp Packer HCL templates to generate an AWS AMI leveraging an EBS volume layout partitioned specifically for `/` (root), `/data/user/repositories`, and `/var/log`.
@@ -36,16 +36,6 @@
 - [ ] **Debian Package (`.deb`):** Automate `dpkg-buildpackage` to create Debian packages containing `systemd` unit files and `logrotate.d` configurations.
 - [ ] **RPM Package (`.rpm`):** Write RPM SPEC files to build packages for RHEL/CentOS distributions, including SELinux context restoration hooks (`restorecon`) in the post-install phase.
 
-### 5.4 Git Routing, Proxying & Storage (Spokes / Babeld)
-- [ ] **`babeld` Proxy Implementation:** Develop a highly concurrent Go-based proxy (`babeld` equivalent) to handle incoming Git over SSH and HTTPS traffic multiplexing.
-- [ ] **SNI & Protocol Termination:** Configure the `babeld` proxy to terminate SSL/TLS and route traffic based on SNI (Server Name Indication) and SSH ALPN headers.
-- [ ] **Spokes Replication Engine:** Implement a Spokes-like repository replication orchestrator to ensure every Git repository maintains a strict three-node consensus replica.
-- [ ] **Distributed Lock Manager:** Deploy ZooKeeper or a Consul-backed locking mechanism to serialize concurrent Git pushes to the same repository across the global cluster.
-- [ ] **Git Hook Interceptors:** Implement highly optimized `pre-receive` and `post-receive` Git hooks in Rust to intercept commits, validate GPG signatures, and enforce branch protection rules before writing objects.
-- [ ] **`git-daemon` Optimization:** Tune the internal `git-daemon` to maximize throughput for anonymous, unauthenticated fetch traffic on public repositories.
-- [ ] **Storage Anti-Affinity:** Define strict Kubernetes pod anti-affinity rules for `storage-tier` StatefulSets to guarantee repository replicas are physically spread across distinct AWS Availability Zones.
-- [ ] **Distributed Tracing Headers:** Inject W3C Trace Context headers into all payloads at the proxy layer to maintain distributed traces through the entire Git lifecycle.
-
 ### 5.5 Global Kubernetes Orchestration & Data Stores
 - [ ] **Vitess Operator Deployment:** Deploy the Vitess Kubernetes Operator to orchestrate highly available, sharded MySQL topologies.
 - [ ] **Vitess VSchema Configuration:** Define Vitess VSchemas to shard the `users`, `issues`, and `pull_requests` tables based on a hashed repository ID or user ID index.
@@ -71,13 +61,3 @@
 - [ ] **Air-Gapped Licensing Service:** Develop an offline-capable enterprise licensing validation module utilizing Ed25519 cryptographic signatures for secure, air-gapped license file verification.
 - [ ] **OTA Rolling Upgrades:** Build an Over-The-Air (OTA) orchestrator that parses `.pkg` upgrade payloads, cordons nodes, and applies zero-downtime rolling updates to the virtual appliance cluster.
 
-### 5.7 Portable Single-Node Executable (Zero-Dependency Builds)
-- [ ] **Fully Static Compilation:** Configure the CI/CD pipeline to compile fully statically linked ELF binaries for Linux using `musl` libc to ensure zero host-level shared library requirements.
-- [ ] **Frontend Asset Embedding:** Implement build steps using `rust-embed` (or `go:embed`) to bundle all compiled React/Next.js frontend assets, CSS, and localized templates directly into the compiled native binary.
-- [ ] **Embedded SQLite Datastore:** Integrate SQLite support with connection pooling, Write-Ahead Logging (WAL), and busy-timeout handling as the default, zero-configuration relational database backend for single-node deployments.
-- [ ] **In-Process SSH Server:** Embed a pure Go/Rust SSH server (e.g., `russh` or `gliderlabs/ssh`) listening on a custom port to handle `git+ssh://` operations natively without requiring host `sshd` integration or user account creation.
-- [ ] **In-Process Background Scheduler:** Implement an internal task supervisor to manage cron jobs, webhook deliveries, and background queue processing (via an embedded queue like SQLite) independent of external message brokers (RabbitMQ/Kafka).
-- [ ] **Embedded Search Engine Fallback:** Provide a lightweight, embedded full-text search alternative (e.g., SQLite FTS5 or Bleve/ZincSearch) to fallback from Elasticsearch for code and issue indexing in the portable execution mode.
-- [ ] **Auto-Provisioning & Zero-Config:** Build a first-run initialization routine that automatically detects the host environment, generates a secure default configuration (TLS certificates, JWT secrets), and bootstraps the initial admin user.
-- [ ] **Cross-Platform Standalone Binaries:** Output standalone `.exe` (Windows), Mach-O (macOS), and ELF (Linux) binaries natively, guaranteeing no external runtime dependencies (Node.js, Python, or Ruby) are required on the target host.
-- [ ] **Built-in Daemonization Support:** Add built-in CLI flags (e.g., `github-clone web --daemon`) and generate helper scripts for users who wish to wrap the single binary trivially in systemd or Windows Services later.
