@@ -21,3 +21,17 @@
 - [ ] Implement request hedging (sending duplicated read requests to multiple replicas after a short timeout) to guarantee 99th percentile latency targets (<1ms).
 - [ ] Implement a distributed rate-limiter based on the Token Bucket algorithm specifically for the AuthZ API tier.
 
+
+### Tier 2: CODEOWNERS Enforcement
+- [ ] Implement a highly optimized Rust parser for `.github/CODEOWNERS` files, accurately processing standard gitignore-style path globbing.
+- [ ] Build the resolution engine: dynamically map extracted paths (e.g., `src/**/*.rs`) to corresponding users (`@samuel`) or teams (`@org/backend`).
+- [ ] Integrate the CODEOWNERS resolution step into the Pull Request state machine: when a PR is created or synchronized, automatically calculate the diff paths and assign the required reviewers.
+- [ ] Translate CODEOWNERS rules into strict Branch Protection checks, blocking the "Merge" button unless an explicit approval from the exact mapped Owner exists.
+- [ ] Implement team expansion logic: if a CODEOWNER is a team, recursively query the Zanzibar Graph to identify all valid members and track any single member's approval as fulfilling the team requirement.
+
+### Tier 3: Custom Roles & RBAC Expansion
+- [ ] Define the `custom_repository_roles` and `custom_organization_roles` Postgres schema, extending the default Read/Triage/Write/Maintain/Admin hierarchy.
+- [ ] Build the Angular UI allowing Organization Administrators to define custom roles by selecting from a granular list of >40 specific permission bits (e.g., `bypass_branch_protection`, `manage_webhooks`, `delete_issues`).
+- [ ] Compile the user-defined custom roles down into the NCL (Namespace Configuration Language) schema representing the exact structural permissions within the Zanzibar graph.
+- [ ] Modify the Authorization middleware (`RequireScope`) to dynamically evaluate the expanded permission bitmasks in real-time instead of checking static string roles.
+- [ ] Ensure custom role mutations (e.g., changing a role's permissions) instantly trigger a re-compilation of the associated ACLs and flush the distributed Redis authorization cache.

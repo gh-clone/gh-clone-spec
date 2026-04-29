@@ -180,3 +180,64 @@
 - [ ] **Storage Anti-Affinity:** Define strict Kubernetes pod anti-affinity rules for `storage-tier` StatefulSets to guarantee repository replicas are physically spread across distinct AWS Availability Zones.
 - [ ] **Distributed Tracing Headers:** Inject W3C Trace Context headers into all payloads at the proxy layer to maintain distributed traces through the entire Git lifecycle.
 
+
+### 3.4 Deploy Keys & Fine-Grained Authentication
+- [ ] **Deploy Keys Database Schema:** Define the `deploy_keys` Postgres table linking a specific SSH public key exclusively to a single `repository_id`.
+- [ ] **Read/Write Scopes for Deploy Keys:** Implement the boolean `read_only` flag on the deploy key, enforcing this state strictly during the Git push (`receive-pack`) authorization phase.
+- [ ] **SSH Multiplexer Deploy Key Override:** Modify the SSH `PublicKeyHandler` to search the `deploy_keys` table if the fingerprint is not found in the global user `ssh_keys` table.
+- [ ] **Deploy Key Context Mapping:** Ensure a connection authenticated via a Deploy Key creates an anonymous session context specifically bound to the repository, bypassing normal user identity checks.
+- [ ] **Fine-Grained PAT Infrastructure:** Define the `fine_grained_pats` Postgres schema to support resource-specific permissions (e.g., Read on `repo:123`, Write on `repo:456`).
+- [ ] **Permission Matrix Compilation:** Implement a Rust engine to compile the Fine-Grained PAT's JSON payload of rules into an efficient bitmask or fast-lookup hash map stored in Redis.
+- [ ] **Endpoint Level Authorization Middleware:** Update the Axum REST middleware to evaluate Fine-Grained PAT claims against the requested resource (e.g., verifying `issues:write` scope strictly for the targeted repository).
+- [ ] **Token Expiration & Rotation Enforcement:** Build background workers that automatically invalidate Fine-Grained PATs based on their strictly required expiration dates (maximum 1 year).
+
+### 3.4 Archive Generation & Streaming
+- [ ] **Git Archive RPC:** Define a specific Gitaly/Spokes gRPC interface (`GetArchive`) that requests a specific repository and commit SHA to be compressed.
+- [ ] **Streaming Compression:** Implement the storage-node execution of `git archive --format=zip` or `tar`, piping stdout directly into the gRPC bidirectional stream to bypass memory buffering.
+- [ ] **In-Flight Caching:** Configure the API edge nodes to transparently cache the resulting ZIP payloads for frequently accessed release tags (e.g., `v1.0.0.zip`), bypassing the storage nodes entirely during viral traffic spikes.
+
+### 3.5 Git LFS File Locking Protocol
+- [ ] Implement the complete Git LFS File Locking API (`POST /info/lfs/locks`, `GET /info/lfs/locks`, `POST /info/lfs/locks/{id}/unlock`, `POST /info/lfs/locks/verify`).
+- [ ] Define the `lfs_locks` Postgres table: `id`, `repo_id`, `path`, `owner_id`, `created_at`.
+- [ ] Implement the `POST /info/lfs/locks` endpoint to securely lock a file path, ensuring atomic inserts to prevent race conditions during concurrent lock attempts by game developers.
+- [ ] Build the strict verification engine inside the `pre-receive` Git hook: when a user pushes commits, strictly verify that any modified files matching LFS paths are either unlocked, or explicitly locked by the pushing user.
+- [ ] Reject the `git push` directly in the `pre-receive` hook with a standard LFS locking error message if a file is locked by a different user.
+- [ ] Implement the "Force Unlock" capability (`POST /info/lfs/locks/{id}/unlock`), enforcing RBAC to ensure only the lock owner or a Repository Admin can forcefully drop a lock.
+- [ ] Render an Angular UI inside the repository "Settings" or "Code" view displaying all actively locked LFS paths, their owners, and timestamps.
+
+### Tier 4: Subversion (SVN) Client Bridge & Custom Hooks
+- [ ] **SVN Protocol Gateway:** Implement an SVN network protocol parser natively in Rust, listening on port 3690 (svn://) and multiplexing over HTTP (WebDAV).
+- [ ] **WebDAV Support:** Handle SVN-specific XML namespaces and HTTP methods (`PROPFIND`, `REPORT`, `OPTIONS`, `MKACTIVITY`, `CHECKOUT`, `PUT`) required by standard SVN clients.
+- [ ] **Dynamic Revision Mapping:** Map linear SVN revision numbers to non-linear Git commit SHAs dynamically, utilizing a fast Redis caching layer for the translation table.
+- [ ] **On-the-Fly Tree Generation:** Translate SVN `checkout` and `update` commands into virtualized `git archive` operations or rapid tree-walks via `gitoxide`.
+- [ ] **Delta Payload Processing:** Support SVN `commit` by parsing the SVN delta payloads and converting them directly into Git Blob and Tree objects in-memory before writing the Git commit.
+- [ ] **Ignore Rule Translation:** Parse `.gitignore` rules in the Git tree and enforce them during SVN addition commands to maintain repository consistency.
+- [ ] **Branch/Tag Emulation:** Emulate SVN's `branches/` and `tags/` directory structure conventions by mapping them natively to actual Git branches and tags on the backend.
+- [ ] **Enterprise Pre-Receive Hook Execution:** Extend the native `replica-hook-pre-receive` binary to dynamically query and fetch globally enforced Enterprise hooks from the API.
+- [ ] **Hook Sandboxing:** Initialize a strict `libmountsandbox` isolated execution context for each custom Bash/Python hook to prevent host breakout and lateral movement.
+- [ ] **Read-Only Context:** Mount the target Git repository strictly as read-only within the hook sandbox to ensure the hook cannot secretly mutate the repository state.
+- [ ] **Resource Quotas:** Enforce hard timeouts (e.g., 5000ms) and CPU limits to prevent poorly written custom Bash scripts from causing denial-of-service during Git pushes.
+- [ ] **Sideband Streaming:** Pipe standard error (`stderr`) and output (`stdout`) from the sandboxed hook directly back to the Git client's terminal using Git Sideband-64k packets.
+
+### Tier 4.1: Subversion (SVN) Client Bridge (Deep Implementation)
+- [ ] **XML-RPC / WebDAV Engine:** Utilize `quick-xml` and `axum` to build a highly concurrent HTTP-based WebDAV engine parsing SVN `PROPFIND` and `REPORT` requests without heavy memory allocation.
+- [ ] **Delta-V Versioning Protocol:** Implement Delta-V HTTP extensions mapping `MKACTIVITY`, `CHECKOUT`, and `MERGE` methods directly to virtual Git staging index creations.
+- [ ] **`vcc` (Version-Controlled Configuration) Resolution:** Map SVN VCC paths securely to backend repository bare paths, enforcing authentication on the initial `OPTIONS` handshake.
+- [ ] **SVN Revision Mapping Index:** Build a secondary Postgres table `svn_revisions` mapping sequential integer SVN revisions to 40-character Git SHAs to enable O(1) history lookups.
+- [ ] **Git to SVN Property Emulation:** Read Git attributes (`.gitattributes`) and file modes (`100755`) to synthesize equivalent `svn:executable` and `svn:mime-type` properties in the WebDAV response.
+- [ ] **`update-report` Translation Engine:** Implement the SVN `update-report` command by executing a `git diff-tree` between the requested SVN revision's corresponding Git SHA and the `HEAD` SHA.
+- [ ] **`log-report` Commit History:** Translate SVN `log-report` requests into highly optimized `gitoxide` commit graph traversals, formatting Git commit authors, dates, and messages into standard SVN XML formats.
+- [ ] **Inline Delta Compression (svndiff):** Implement the `svndiff` (v0/v1) binary encoding format natively in Rust to stream compressed file diffs back to the SVN client during `update` operations.
+- [ ] **TxDelta Payload Ingestion:** Parse incoming `svndiff` delta payloads from SVN `PUT` requests, reconstructing the full file blob in-memory and hashing it for Git object insertion.
+- [ ] **SVN Directory Layout Emulation:** Map the implicit Git repository root to the SVN `trunk/` directory, and map Git branches natively to the `branches/` virtual directory.
+- [ ] **SVN Locking Mechanism Emulation:** Intercept SVN `LOCK` requests and translate them strictly to the Git LFS File Locking API, ensuring locks are respected across both protocols.
+
+### Tier 4.2: Advanced Pre-Receive Hook Sandboxing
+- [ ] **gRPC Hook Broker:** Implement a local gRPC server within the storage nodes specifically to receive and execute custom enterprise hook payloads requested by the `pre-receive` binary.
+- [ ] **`libmountsandbox` cgroups Profiling:** Apply strict Linux `cgroups v2` resource controls via the sandbox: restrict custom bash/python hooks to 1 CPU core and a maximum of 256MB RAM.
+- [ ] **OverlayFS Read-Only Mounts:** Utilize `overlayfs` to mount the entire target bare Git repository into the sandbox namespace strictly as `ro` (read-only) to guarantee hooks cannot bypass Git object immutability.
+- [ ] **Network Namespace Dropping:** Explicitly drop the `CLONE_NEWNET` namespace within the hook sandbox to strictly prevent custom enterprise hooks from making unauthorized outbound HTTP requests (data exfiltration).
+- [ ] **Standard IO Multiplexing:** Capture `stdout` and `stderr` streams from the sandboxed hook process via Unix Domain Sockets, chunking the output securely into Git Sideband-64k packets (`\x02`).
+- [ ] **Execution Chain Short-Circuiting:** Implement fail-fast logic for execution chains: if Hook A exits with a non-zero status code, instantly terminate the push without evaluating Hook B or Hook C.
+- [ ] **Push Option Variable Injection:** Parse Git push options (`git push -o key=value`) and securely inject them into the hook's sandbox environment variables (`GIT_PUSH_OPTION_0=key=value`).
+- [ ] **Hook Timeout Watchdog:** Implement a strict `tokio::time::timeout` wrapper on the hook execution future; if the hook hangs beyond 10 seconds, send a `SIGKILL` to the sandbox and reject the Git push with a timeout error.

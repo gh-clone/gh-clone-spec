@@ -127,3 +127,73 @@
 - [ ] **Network Isolation:** Provision a unique `docker network create` per workflow execution to prevent parallel workflows on the same host from sniffing traffic.
 - [ ] **Cleanup:** Rely on `libmountsandbox` bounded execution contexts and timeout polling to rigidly enforce cleanup of orphan containers and resources upon exit.## 5. OMNI-PLATFORM DEPLOYMENT & PACKAGING DEEP DIVE
 
+
+#### Marketplace & Debugging
+- [ ] Build the action resolution fallback: if `uses: org/repo@v1` is not local, fetch the tarball from the global Marketplace registry.
+- [ ] Implement aggressive caching of global actions (e.g., `actions/checkout@v4`) at the control-plane level to prevent rate-limiting from upstream.
+- [ ] Build a local action proxy registry so air-gapped runners can pull `uses: ...` from the internal backend without internet access.
+- [ ] Implement SHA pin validation: if `uses: org/repo@sha`, explicitly pull and verify the exact commit hash instead of a tag.
+- [ ] Integrate a `tmate` or WebRTC-based SSH tunnel daemon into the runner loop for "Re-run jobs with SSH".
+- [ ] Expose an ephemeral SSH port and secure web-based terminal for active job debugging via the frontend UI.
+- [ ] Enforce strict timeouts on active debug sessions (e.g., maximum 30 minutes) to prevent compute resource abuse.
+- [ ] Ensure debug session secrets are masked from the TTY output just as they are from standard log streams.
+
+#### Marketplace, Resolvers & Interactive Debugging (Expanded)
+- [ ] Build the global Action resolution fallback: if `uses: org/repo@v1` is not a local path, fetch the tarball from the global Marketplace registry.
+- [ ] Implement aggressive caching of global actions (e.g., `actions/checkout@v4`) at the control-plane level to prevent rate-limiting from upstream GitHub APIs.
+- [ ] Build a local action proxy registry so air-gapped runners can pull `uses: ...` dependencies entirely from the internal backend without external internet access.
+- [ ] Implement strict SHA pin validation: if a workflow specifies `uses: org/repo@sha`, explicitly pull and verify the exact commit hash instead of a mutable tag.
+- [ ] Develop an internal DNS caching mechanism for the runner agent to speed up recurrent network requests during execution.
+- [ ] Integrate a `tmate` or WebRTC-based SSH tunnel daemon natively into the runner loop to support the "Re-run jobs with SSH" diagnostic feature.
+- [ ] Expose an ephemeral SSH port and secure web-based terminal (via `xterm.js`) for active job debugging directly via the frontend UI.
+- [ ] Enforce strict absolute timeouts on active debug sessions (e.g., maximum 30 minutes) to prevent users from abusing compute resources for cryptomining.
+- [ ] Ensure debug session secrets are masked continuously from the TTY output just as rigorously as they are from standard log streams.
+- [ ] Capture the SSH audit log of executed commands during a debug session and attach it to the final workflow run artifact for security compliance.
+- [ ] Implement runner sidecar containers natively: allowing jobs to spin up detached `services:` (like Postgres or Redis) bound to the job's dedicated Docker network.
+- [ ] Validate Docker `HEALTHCHECK` states for all declared services before transitioning the workflow execution to the first job step.
+
+### Tier 6: Hardware Acceleration & Ecosystem Parity
+- [ ] **GPU Runner Provisioning:** Integrate with AWS EC2 (p3/g4 instances) or Kubernetes Device Plugins to dynamically allocate hardware-accelerated runners for ML workflows.
+- [ ] **VRAM Isolation:** Utilize `libmountsandbox` to strictly partition GPU VRAM and compute units between sequential runner jobs to prevent context leakage.
+- [ ] **Twirp Cache API Implementation:** Implement the strict `twirp` protobuf over HTTP protocol expected by the official `@actions/cache` package for seamless cache hits.
+- [ ] **OIDC Federation Mapping:** Ensure exact parity with GitHub's OIDC implementation, strictly mapping the `aud` (audience) and `sub` (subject) claims to integrate natively with AWS IAM and GCP Workload Identity.
+- [ ] **Larger Runners Orchestration:** Provide API configurations allowing enterprise users to request specific CPU core counts (e.g., 64-core) and RAM allocations natively in their `runs-on` YAML tags.
+- [ ] **Ephemeral Runner Auto-Scaling:** Implement the scale-to-zero autoscaler that spins up specialized runners exactly when requested and permanently destroys the instance upon job completion.
+
+### Tier 8: Immutable Artifacts (v4 Protocol)
+- [ ] **Artifacts v4 Routing:** Implement the specific `/twirp/github.actions.results.api.v1.ArtifactService` gRPC-Web / Twirp endpoints expected by the modern `@actions/artifact` v4 package.
+- [ ] **Immutable Blob Backend:** Engineer the backend to treat v4 artifacts as entirely immutable blobs, rejecting any subsequent appends or modifications to a finalized artifact.
+- [ ] **Zip Generation on the Fly:** Configure the backend to generate uncompressed Zip streams natively in Rust from the stored chunk metadata to support immediate frontend downloads.
+- [ ] **Streaming Upload Handlers:** Build ultra-fast streaming HTTP upload handlers that bypass memory buffering and stream artifact chunks directly to S3/MinIO using multipart upload APIs.
+- [ ] **Retention Policy Enforcement:** Integrate the v4 artifacts schema with the background TTL sweepers to ensure strict deletion after the repository-configured retention period (e.g., 90 days default).
+- [ ] **Actions Summary UI Integration:** Render v4 artifacts immediately in the Angular workflow run UI, providing direct download links and precise byte size calculations per artifact.
+
+### Tier 9: Native Actions Marketplace & Publishing
+- [ ] **Marketplace Registry Schema:** Define the Postgres schema for `actions_marketplace_listings`, linking a specific repository, description, and semantic version tag to a published Action.
+- [ ] **Action Manifest Parser:** Implement a rigorous Rust validation step during publication that parses the `action.yml` or `action.yaml` utilizing `serde_yaml`.
+- [ ] **Manifest Syntax Enforcement:** Validate `inputs`, `outputs`, and strictly verify the `runs` block specifies valid execution environments (e.g., `using: 'node20'`, `composite`, or `docker`).
+- [ ] **Icon & Branding Validation:** Parse the `branding.icon` and `branding.color` tags in the manifest, strictly validating the icon string against the allowed dictionary of Feather icons to prevent UI rendering errors.
+- [ ] **Publishing Pipeline:** Build the `POST /marketplace/actions/publish` API endpoint, securely accepting a Git tag reference and indexing the repository's metadata into the global registry.
+- [ ] **Namespace Squatting Protection:** Enforce database constraints guaranteeing that an Action can only be published under a namespace matching the verified organization or username of the publisher.
+- [ ] **Version Resolution Engine:** Implement the internal routing logic in Rust to map `uses: my-org/my-action@v1` dynamically to the absolute Git SHA or the highest `v1.x.x` semantic release tag.
+- [ ] **Marketplace Search Index:** Synchronize published actions into Elasticsearch/ZincSearch natively via Rust background workers, allowing users to search by category (e.g., "Deployment", "Code Quality").
+- [ ] **Action Verification Badges:** Implement a verification system (blue checkmark) in the Postgres schema for actions published by recognized enterprise partners or verified internal organization domains.
+- [ ] **README Extraction & Caching:** Build a worker to extract the target repository's `README.md` at the published tag, render it into sanitized HTML, and cache it in Redis specifically for rapid display on the Marketplace UI.
+- [ ] **Docker Action Pre-build Cache:** For published Docker container actions, implement a worker that detects the `Dockerfile`, pre-builds the image via the internal runner fleet, and caches the layers in the OCI registry to eliminate build times for downstream users.
+- [ ] **Composite Action Inlining:** Optimize workflow dispatch by resolving and deeply inlining nested composite actions on the Rust control plane *before* sending the execution graph to the runner, reducing network round-trips.
+- [ ] **Release Webhook Ingestion:** Implement a listener on the internal `release.published` Kafka topic to automatically trigger a new version publication in the Marketplace if the repository is already listed.
+- [ ] **Marketplace Telemetry Tracking:** Track total successful job invocations per published action globally, aggregating metrics hourly into TimescaleDB.
+- [ ] **Author Analytics Endpoints:** Expose aggregated usage metrics via the REST API, allowing the action author to view adoption graphs and failure rates via the frontend UI.
+### Tier 10: Runner Images Pipeline & OS Provisioning
+- [ ] Configure a Packer and Ansible-based infrastructure pipeline to deterministically build the 50GB+ standard GitHub-hosted runner images (Ubuntu, Windows, macOS).
+- [ ] Automate the nightly fetching and compilation of 100+ standard SDKs (Java, Node.js, Python, Ruby, Go, Rust, .NET) into the base images.
+- [ ] Implement a rigorous caching strategy utilizing ZFS or Btrfs snapshots on the host nodes to instantiate the massive runner images into Firecracker microVMs in under 5 seconds.
+- [ ] Create automated test suites executing against newly baked runner images to verify binary PATHs, permission boundaries, and pre-installed tool versions before promoting them to production.
+- [ ] Provide self-hosted runner administrators with a localized script generator to replicate the exact official runner environment on their own proprietary hardware.
+
+### Tier 11: Actions Tool Cache Distribution CDN (`actions/setup-*`)
+- [ ] Architect the `actions-tool-cache` Rust service to proxy and mirror official binary distributions (e.g., nodejs.org, python.org) into an internal S3/CDN bucket.
+- [ ] Build a transparent HTTP interceptor injected into the runner networking stack to reroute `actions/setup-*` download requests directly to the internal low-latency CDN.
+- [ ] Implement automatic fallback logic for the tool cache: if an esoteric SDK version is requested and misses the internal CDN, fetch it directly, stream it to the runner, and cache it asynchronously.
+- [ ] Configure aggressive edge caching policies ensuring tool cache binaries have an `Immutable` Cache-Control to drastically reduce external egress costs.
+- [ ] Provide an "Air-gapped Pre-warm" utility for enterprise customers to download an entire compressed tool cache index for completely isolated, offline CI environments.

@@ -1,0 +1,52 @@
+# Plan for gh-clone-cdn-raw
+
+### Tier 1: Domain Isolation & Edge Routing
+- [ ] Configure the core infrastructure to support strictly isolated domain architectures: `api.*`, `raw.*`, `avatars.*`, `camo.*`, and the primary application domain.
+- [ ] Deploy a dedicated edge proxy (OpenResty or Rust/Hyper) specifically designed to intercept traffic targeted at CDN domains and strip all sensitive `Cookie` and `Authorization` headers.
+- [ ] Implement strict Cross-Origin Resource Sharing (CORS) rules on the CDN domains, allowing `*` origins but explicitly denying credentials to prevent CSRF data leakage.
+- [ ] Enforce aggressive Content Security Policy (CSP) headers globally on all CDN responses: `default-src 'none'; style-src 'unsafe-inline'; sandbox`.
+- [ ] Implement HTTP Strict Transport Security (HSTS) with `includeSubDomains` and `preload` on all CDN endpoints to guarantee TLS termination.
+
+### Tier 2: `raw.*` Content Serving & MIME Sniffing
+- [ ] Implement the `raw.gh-clone.com/{owner}/{repo}/{branch}/{path}` Rust route directly integrating with the Spokes/Gitaly gRPC backend to fetch pure Blob data.
+- [ ] Strictly force the `Content-Type` header to `text/plain; charset=utf-8` for all executable files (HTML, JS, SVG) served from the `raw` domain.
+- [ ] Inject `X-Content-Type-Options: nosniff` globally on the `raw` domain to instruct browsers to never auto-elevate `text/plain` into an executable script, preventing XSS.
+- [ ] Implement inline syntax highlighting queries (e.g., `?plain=0`) falling back to standard application routing for rich formatting.
+- [ ] Set `Cache-Control: max-age=300` (5 minutes) for raw file URLs matching branches (`main`) to balance freshness with caching.
+- [ ] Set `Cache-Control: max-age=31536000, immutable` for raw file URLs matching explicit 40-character Git Commit SHAs.
+- [ ] Implement `Content-Disposition: inline` for safe media (PNG, JPG) and `Content-Disposition: attachment` for unknown binaries on the raw domain.
+
+### Tier 3: `camo.*` Image Proxy & Privacy
+- [ ] Build the Camo Rust proxy service to securely intercept, fetch, and serve third-party images embedded within Markdown bodies.
+- [ ] Implement the URL generator in the Markdown AST parser: convert `![img](http://insecure.com/a.png)` to `![img](https://camo.gh-clone.com/{hmac}/{hex_url})`.
+- [ ] Generate the HMAC-SHA1 signature using a strict internal secret to completely prevent open-proxy SSRF abuse.
+- [ ] Implement the Rust fetching worker utilizing `reqwest` to securely stream the external image payload through the backend to the client.
+- [ ] Enforce a strict 5MB `Content-Length` limit on all Camo fetches; abort the stream immediately if the external server exceeds this to prevent memory exhaustion.
+- [ ] Implement a specific `timeout` (e.g., 4 seconds) on the Camo fetch; return a default "broken image" SVG if the external host hangs.
+- [ ] Strip all original HTTP tracking headers (`Set-Cookie`, `Server`) from the external payload before relaying the image to the client browser.
+- [ ] Rewrite the `Content-Type` dynamically based on the Magic Bytes (hex signature) of the downloaded stream rather than trusting the external server's header.
+
+### Tier 4: `avatars.*` Generation & Distribution
+- [ ] Implement the Identicon generation algorithm purely in Rust (e.g., utilizing `identicon-rs`) mapping MD5 user hashes to deterministic 5x5 grid patterns.
+- [ ] Build an image processing pipeline utilizing the `image` crate to automatically resize, compress, and strip EXIF metadata from user-uploaded avatars.
+- [ ] Restrict uploaded avatars to WebP, PNG, or JPEG formats, converting all payloads to a highly optimized WebP format for storage.
+- [ ] Route `avatars.gh-clone.com/{username}` dynamically: fetch the Blob from S3, applying a `Cache-Control: public, max-age=2592000` (30 days).
+- [ ] Implement size arguments (e.g., `?s=40`) allowing the edge proxy or Varnish layer to dynamically return cropped versions of the master avatar.
+- [ ] Synchronize the URL parameters (`&v=4`) representing the cache-busting version integer, dynamically incrementing it in the database when a user uploads a new avatar.
+
+### Tier 5: Release Assets & LFS Edge Delivery
+- [ ] Integrate the `objects.gh-clone.com` domain specifically for routing heavy binaries (Git LFS, Release ZIPs) without passing through the primary API memory space.
+- [ ] Build the redirect abstraction: API calls to download a release asset return an HTTP `302 Found` redirecting the client specifically to the `objects` subdomain.
+- [ ] Utilize AWS S3 Pre-Signed URLs (or Cloudflare R2 tokens) strictly bound to the requested asset and expiring precisely after 5 minutes.
+- [ ] Apply `application/octet-stream` explicitly to all Pre-Signed URLs to force download behavior in the browser.
+- [ ] Configure Cross-Origin Resource Sharing (CORS) on the S3 bucket to strictly allow `GET` from `*` to support headless CLI fetchers.
+- [ ] Track egress byte volumes generated by LFS and Release downloads via CDN log ingestion into the internal TimescaleDB/Billing engine.
+### Tier 6: Dynamic Social Assets (OpenGraph)
+- [ ] Deploy a dedicated, high-performance edge microservice in Rust specifically for rendering dynamic PNG assets for `og:image` and `twitter:image` tags.
+- [ ] Utilize `resvg` and `usvg` (or `tiny-skia`) in Rust to natively parse complex HTML/SVG templates and rasterize them into compressed PNG bytes without requiring a headless Chromium instance.
+- [ ] Implement the Repository Card template: dynamically query the database for the repo's Name, Description, Primary Language, Star Count, and Fork Count, and inject these into the SVG AST.
+- [ ] Implement the Issue/PR Card template: render the author's avatar, issue title, issue number, and status icon (Open/Closed/Merged) dynamically onto the canvas.
+- [ ] Implement the User Profile Card template: render the user's avatar, handle, follower count, and total contribution grid summary dynamically.
+- [ ] Configure aggressive edge caching strategies: set `Cache-Control: public, max-age=86400` (24 hours) on generated OpenGraph PNGs to drastically reduce rendering load during viral Twitter/Reddit spikes.
+- [ ] Implement ETags and cache-invalidation hooks: if a repository's star count passes a major milestone (e.g., 10k), proactively evict the stale `og:image` from the edge cache.
+- [ ] Support dynamic theme selection via URL parameters (e.g., `?theme=dark` vs `?theme=light`) allowing platforms to request OpenGraph images matching their native aesthetics.

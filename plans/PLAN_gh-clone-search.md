@@ -21,3 +21,12 @@
 - [ ] Implement incremental code indexing: only hash, parse, and index the specific blobs that changed in a given commit.
 - [ ] Expose an internal gRPC search endpoint that scatter-gathers user queries across the sharded Blackbird cluster and aggregates results.
 
+
+### Tier 3: Precise Code Navigation (`stack-graphs`)
+- [ ] Integrate the `stack-graphs` framework natively into the Rust backend indexing pipeline to replace simplistic tree-sitter heuristics for semantic navigation.
+- [ ] Build a dedicated background worker to calculate and persist stack graph definitions for supported languages (Python, JavaScript, TypeScript, Rust, Java) upon every `git push`.
+- [ ] Implement the `stack-graphs` resolution engine to precisely resolve cross-repository and cross-package symbol references, distinguishing between local variables and global exports.
+- [ ] Design a highly compressed storage schema in Postgres/RocksDB to store the generated stack graph paths efficiently without ballooning the database beyond the size of the Git objects themselves.
+- [ ] Map the resolved stack graph data directly to the Angular blob viewer, enabling frame-perfect "Go to Definition" and "Find All References" context menus natively in the browser.
+- [ ] Implement a graceful degradation mechanism: if `stack-graphs` computation times out on massive monolithic files, fall back to the standard Ctags/Tree-sitter fuzzy search for that specific blob.
+- [ ] Expose GraphQL endpoints strictly for querying resolved symbols, allowing IDE extensions to leverage the server-side stack graph index without downloading the entire repository AST.

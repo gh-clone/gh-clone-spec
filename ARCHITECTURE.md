@@ -55,7 +55,79 @@ Deployment automation and appliance generation.
 - **Tech:** Terraform, Kubernetes Operator, Packer, Ansible.
 - **Role:** Responsible for building the Amazon AMIs, Azure VHDs, VMware OVAs, and KVM disks. Contains Helm charts for the Enterprise distributed deployment.
 
----
+### `gh-clone-projects`
+The Memex (Projects V2) replica.
+- **Tech:** Rust, yjs, WebSockets, React.
+- **Role:** Handles real-time CRDT (Conflict-free Replicated Data Type) synchronization, Kanban boards, and spreadsheet virtual grids.
+
+### `gh-clone-pages`
+The GitHub Pages edge router and deployment pipeline.
+- **Tech:** OpenResty (Nginx+Lua), Rust, Let's Encrypt (ACME).
+- **Role:** Dynamically routes `*.github.io` wildcard subdomains, provisions TLS certs, and serves CDN-cached static sites built via CI.
+
+### `gh-clone-security`
+The CodeQL and Dependabot execution engines.
+- **Tech:** Rust, Hyperscan, Firecracker.
+- **Role:** Ingests SARIF payloads, parses SemVer manifests (`package.json`, `Cargo.toml`), and intercepts pushes containing secrets via Hyperscan regex.
+
+### `gh-clone-packages`
+The multi-protocol registry emulator.
+- **Tech:** Rust, S3/MinIO.
+- **Role:** Natively speaks the protocols for npm, Maven, Docker v2 (OCI), NuGet, and RubyGems, backed by unified blob storage.
+
+### `gh-clone-discussions`
+The Q&A threading and category engine.
+- **Tech:** Rust, Redis, GraphQL.
+- **Role:** Provides the complex GraphQL Relay schema for nested comments, pinned answers, and Redis-backed high-concurrency upvote handling.
+
+### `gh-clone-gists`
+The headless Git snippet platform.
+- **Tech:** Rust, `libgit2`, Monaco Editor.
+- **Role:** Manages isolated headless Git repositories for code snippets, supporting Secret Gists and embeddable JavaScript generation.
+
+### `gh-clone-billing`
+The Stripe integration and telemetry subsystem.
+- **Tech:** Rust, Stripe API, OpenTelemetry.
+- **Role:** Tracks metered usage for Actions/Storage, handles Stripe webhooks for subscription states, SCIM 2.0 provisioning, and Sponsors payouts.
+
+### `gh-clone-wikis`
+The Gollum-compatible rendering pipeline.
+- **Tech:** Rust, `libgit2`.
+- **Role:** Manages parallel `.wiki.git` repositories, executing 3-way merges for concurrent web edits and serving sanitized Markdown/MathJax HTML.
+
+
+### `gh-clone-web-ide`
+The pure in-browser VS Code experience (github.dev).
+- **Tech:** TypeScript (`vscode-web`), Rust, IndexedDB.
+- **Role:** Bridges the VS Code FileSystemProvider API directly to the Rust Git Tree endpoints. Manages uncommitted state via IndexedDB and commits changes entirely within the browser without a compute container.
+
+### `gh-clone-checks`
+The Checks API and rich CI/CD annotations engine.
+- **Tech:** Rust, Angular CDK.
+- **Role:** Orchestrates Check Suites and Runs. Streams massive build logs to the frontend via SSE and renders line-level code annotations directly within the PR diff viewer.
+
+### `gh-clone-migrations`
+The repository importer and data takeout exporter.
+- **Tech:** Rust, Angular.
+- **Role:** Connects to third-party APIs (GitLab, Bitbucket) to ingest repositories. Also handles generating high-fidelity `.tar.gz` JSON archives for user data takeout.
+
+### `gh-clone-moderation`
+The Trust & Safety and DMCA enforcement subsystem.
+- **Tech:** Rust, Angular, PhotoDNA, Akismet.
+- **Role:** Automatically detects spam via ML heuristics, scans attachments for CSEM, and provides global shadow-banning capabilities and DMCA Git-layer blocking.
+
+### `gh-clone-classroom`
+The GitHub Education LTI integration platform.
+- **Tech:** Rust, Angular, GitHub Actions.
+- **Role:** Integrates with Canvas/Moodle via LTI 1.3. Generates student repositories from templates and executes auto-grading test suites via composite Actions.
+
+### `gh-clone-mobile`
+The native iOS and Android application shell.
+- **Tech:** Ionic Framework, Angular, Capacitor, Swift, Kotlin.
+- **Role:** Wraps the Angular frontend into a native app. Provides offline IndexedDB caching, biometric authentication, push notifications, and a swipe-to-review PR interface.
+
+
+
 
 ## 2. Subsystem Integrations & Moving Parts
 

@@ -20,7 +20,7 @@
 - [ ] **Nginx Routing Rules:** Implement an automatic config templater for `nginx.conf` that translates application routing policies into Nginx server blocks.
 - [ ] **Let's Encrypt / ACME:** Integrate an ACME client to allow automatic provisioning and renewal of TLS certificates for the appliance's external hostname.
 - [ ] **Custom CA Injection:** Provide a CLI utility (`ghe-ssl-certificate-setup`) to inject and trust enterprise internal Root Certificate Authorities into the system trust store.
-- [ ] **Management Console Frontend:** Develop a React/Next.js based administration web interface (served on port 8443) for visual cluster status and configuration.
+- [ ] **Management Console Frontend:** Develop an Angular based administration web interface (served on port 8443) for visual cluster status and configuration.
 - [ ] **Management Console Backend:** Implement a PAM-integrated authentication backend for the Management Console to support localized OS admin credentials.
 - [ ] **SMTP Outbound Configuration:** Implement the subsystem to configure outbound SMTP relays for platform notifications, including STARTTLS and authentication mechanisms.
 
@@ -61,3 +61,9 @@
 - [ ] **Air-Gapped Licensing Service:** Develop an offline-capable enterprise licensing validation module utilizing Ed25519 cryptographic signatures for secure, air-gapped license file verification.
 - [ ] **OTA Rolling Upgrades:** Build an Over-The-Air (OTA) orchestrator that parses `.pkg` upgrade payloads, cordons nodes, and applies zero-downtime rolling updates to the virtual appliance cluster.
 
+
+### 5.8 Edge Mail Transfer Agent & Security Scanning
+- [ ] **Inbound MTA Deployment:** Deploy and configure Postfix or an equivalent highly available Mail Transfer Agent at the network edge to accept inbound SMTP traffic on port 25.
+- [ ] **SMTP Relaying:** Configure the MTA to proxy sanitized inbound emails directly to the internal Rust-based email processing service via LMTP or gRPC.
+- [ ] **SPF/DKIM/DMARC Validation:** Enforce strict SPF, DKIM, and DMARC verification at the edge MTA, instantly dropping emails that fail cryptographic authentication to prevent spoofed replies to GitHub issues.
+- [ ] **Antivirus Sandbox:** Deploy a dedicated, isolated Kubernetes DaemonSet running ClamAV specifically for real-time malware scanning of all incoming media attachments before they reach persistent object storage.

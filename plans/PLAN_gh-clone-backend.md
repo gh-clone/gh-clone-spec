@@ -293,7 +293,7 @@ The system is strictly divided into `core-domain` (pure Rust, no I/O), `applicat
 - [ ] Implement deterministic Identicon avatar generator using `identicon-rs`.
 - [ ] Hash the user's login name with MD5 to determine grid layout and color.
 - [ ] Render the Identicon to a PNG buffer in memory.
-- [ ] Brotli-compress the PNG buffer and cache it in `moka` with a 30-day TTL.
+- [ Brotli-compress the PNG buffer and cache it in `moka` with a 30-day TTL.
 - [ ] Serve source maps (`.map` files) dynamically, executing a permission check to ensure the requester is an Admin/Developer before serving.
 
 ### 1.2 The "Enterprise Cloud" (Distributed Microservices Mode)
@@ -396,7 +396,7 @@ We do not write API boilerplate. We build a compiler that reads `api.github.com.
 
 ### 5.7 Portable Single-Node Executable (Zero-Dependency Builds)
 - [ ] **Fully Static Compilation:** Configure the CI/CD pipeline to compile fully statically linked ELF binaries for Linux using `musl` libc to ensure zero host-level shared library requirements.
-- [ ] **Frontend Asset Embedding:** Implement build steps using `rust-embed` (or `rust-embed`) to bundle all compiled React/Next.js frontend assets, CSS, and localized templates directly into the compiled native binary.
+- [ ] **Frontend Asset Embedding:** Implement build steps using `rust-embed` (or `rust-embed`) to bundle all compiled Angular 21 (Zoneless) frontend assets, CSS, and localized templates directly into the compiled native binary.
 - [ ] **Embedded SQLite Datastore:** Integrate SQLite support with connection pooling, Write-Ahead Logging (WAL), and busy-timeout handling as the default, zero-configuration relational database backend for single-node deployments.
 - [ ] **In-Process SSH Server:** Embed a pure Go/Rust SSH server (e.g., `russh` or `gliderlabs/ssh`) listening on a custom port to handle `git+ssh://` operations natively without requiring host `sshd` integration or user account creation.
 - [ ] **In-Process Background Scheduler:** Implement an internal task supervisor to manage cron jobs, webhook deliveries, and background queue processing (via an embedded queue like SQLite) independent of external message brokers (RabbitMQ/Kafka).
@@ -499,3 +499,115 @@ We do not write API boilerplate. We build a compiler that reads `api.github.com.
     - [ ] Provision temporary, short-lived `GITHUB_TOKEN`s for CI/CD pipeline workers.
     - [ ] Scope `GITHUB_TOKEN` permissions strictly to the executing repository unless explicitly overridden in the workflow file.
     - [ ] Ensure `GITHUB_TOKEN`s are automatically revoked and deleted from the database the millisecond the CI job completes.
+### 0.9 Enterprise Identity & Marketplaces
+- [ ] Define routing and DB tables for SAML Single Sign-On configuration (IdP URL, X.509 Certificate, Issuer).
+- [ ] Implement the SAML Assertion Consumer Service (ACS) endpoint parsing XML payloads using `xmlsec`.
+- [ ] Validate SAML signatures strictly to prevent XML Signature Wrapping (XSW) attacks.
+- [ ] Automatically provision Just-In-Time (JIT) shadow users upon successful SAML authentication into the enterprise tenant.
+- [ ] Implement SCIM 2.0 `GET /scim/v2/Users` and `POST /scim/v2/Users` endpoints for automated Okta/Entra ID synchronization.
+- [ ] Support SCIM PATCH operations for granular updates (e.g., changing a user's display name or active status).
+- [ ] Build the GitHub App Marketplace webhook event multiplexer to dispatch events to third-party integrations.
+- [ ] Implement OAuth App and GitHub App granular installation endpoints (per-repository vs all-repositories selection).
+- [ ] Enforce rate limits specifically for third-party App tokens, separate from user PAT limits.
+- [ ] Track revenue and billing models for GitHub Apps via Stripe Connect webhooks.
+
+### 0.9 Enterprise Identity, Marketplaces & SCIM (Expanded)
+- [ ] Define Postgres routing and DB tables for SAML Single Sign-On configuration (IdP URL, X.509 Certificate, Issuer).
+- [ ] Implement the SAML Assertion Consumer Service (ACS) endpoint parsing XML payloads natively using the `xmlsec` crate.
+- [ ] Validate SAML signatures strictly to prevent XML Signature Wrapping (XSW) attacks and enforce strict temporal bounds (`NotBefore`, `NotOnOrAfter`).
+- [ ] Automatically provision Just-In-Time (JIT) shadow users upon successful SAML authentication into the enterprise tenant.
+- [ ] Implement SCIM 2.0 `GET /scim/v2/Users` and `POST /scim/v2/Users` endpoints for automated Okta/Entra ID synchronization conforming to RFC 7644.
+- [ ] Support SCIM PATCH operations for granular field updates (e.g., changing a user's display name or toggling `active` status).
+- [ ] Implement SCIM `DELETE /scim/v2/Users/{id}` to automatically suspend users and invalidate their active sessions.
+- [ ] Build the GitHub App Marketplace webhook event multiplexer to reliably dispatch installation events to third-party integrations.
+- [ ] Implement OAuth App and GitHub App granular installation endpoints distinguishing between "All Repositories" and "Select Repositories".
+- [ ] Enforce dynamic rate limits specifically for third-party App tokens, separate from the standard user PAT quotas.
+- [ ] Track revenue and billing models for GitHub Apps via Stripe Connect webhooks, updating database installation states.
+- [ ] Implement fine-grained repository permissions scopes specifically for GitHub Apps (e.g., `contents: read`, `issues: write`).
+- [ ] Build a robust JWT verification middleware specifically for authenticating incoming requests from GitHub Apps securely.
+- [ ] Implement the UI backend for the Marketplace, exposing GraphQL nodes for App Listings, Reviews, and Pricing plans.
+
+### 2.4 Repository Rulesets & AST Engine
+- [ ] **Ruleset Database Schema:** Define Postgres tables mapping `repository_rulesets` to specific `ref_names` (branches/tags) and `bypass_actors`.
+- [ ] **Abstract Syntax Tree (AST) Rules:** Implement a JSONB-based AST schema to store complex logical conditions (e.g., `Require 2 approvals AND (CI must pass OR Actor is Admin)`).
+- [ ] **Ruleset Evaluation Engine:** Build a highly concurrent Rust evaluation engine that intercepts `git push` hooks and dynamically evaluates the incoming commit against all active rulesets.
+- [ ] **Commit Signature Enforcement:** Add specific rule evaluators to enforce that every commit in the push is cryptographically signed and verified.
+- [ ] **Merge Queue Integration:** Link the Ruleset engine to the Merge Queue, automatically enforcing queue entry requirements if a branch is strictly protected.
+
+### 2.5 Advanced Code Review State Machine
+- [ ] **Review Assignment Algorithms:** Implement round-robin and load-balanced reviewer assignment logic for teams inside Postgres/Rust.
+- [ ] **Viewed File State Management:** Create a distributed tracking table allowing developers to mark specific files as "Viewed" in a PR, persisting this state across active browser sessions.
+- [ ] **Multi-line Suggested Changes:** Extend the PR comment API to support `start_line` and `end_line` parameters to generate "Suggested Changes" diff blocks.
+- [ ] **Suggested Changes Commit Engine:** Build a server-side Git tree mutation endpoint that directly applies a user's approved "Suggested Change" without requiring a local clone or push.
+- [ ] **Review Dismissal Logic:** Implement the state transition logic to automatically dismiss older pending approvals when new commits are forcefully pushed to a PR branch.
+
+### Tier 9: Missing Ecosystem Integrations (Email, Media, Conflicts, Archives)
+- [ ] **Inbound Email Reply Processing:** Build an SMTP ingestion server natively in Rust (utilizing `mailin` or similar) to receive raw RFC 822 email replies to notifications without requiring a heavy external dependency.
+- [ ] **MIME Parsing & Markdown Extraction:** Implement a robust multipart MIME parser to traverse email structures, strip signatures, remove quoted historical replies, and discard HTML formatting, extracting only the user's intended raw text reply.
+- [ ] **Reply-To Token Cryptography:** Generate and validate stateless, cryptographically signed `Reply-To` addresses (e.g., `reply+{repo_id}+{user_id}+{hmac}@replica.com`) to securely authenticate inbound email replies and map them to the correct Issue/PR thread.
+- [ ] **Media Attachment API:** Implement the `POST /upload/policies/assets` API to issue short-lived, pre-signed S3 upload URLs specifically for user-attached media (images, PDFs, videos) inside Markdown text areas, strictly enforcing file type and size quotas.
+- [ ] **Antivirus Pipeline:** Implement a Rust background worker that integrates with `clamd` (ClamAV) to scan all user-uploaded media blobs asynchronously before they are officially linked into the Markdown rendered output, quarantining infected files.
+- [ ] **Conflict Resolution API:** Build a Rust endpoint that utilizes `libgit2` or `gitoxide` to dynamically compute 3-way merges and return the raw file content injected with standard `<<<<<<< HEAD` conflict markers for web-based resolution.
+- [ ] **Conflict Commit Synthesizer:** Implement the backend endpoint to accept a user's manually resolved file content from the UI, generate a new Git tree, and construct the merge commit directly via the backend API without a local clone.
+- [ ] **Archive Streaming (ZIP/TAR):** Implement `GET /{owner}/{repo}/archive/refs/heads/{ref}.zip`, executing `git archive` natively on the storage node and dynamically chunking/streaming the compressed bytes to the HTTP response to prevent memory exhaustion on massive repositories.
+
+### Tier 10: Cross-Fork Collaborations & Submodule Resolution
+- [ ] Implement the "Allow edits from maintainers" feature specifically for Cross-Fork Pull Requests.
+- [ ] Build the authentication override mapping: when a maintainer attempts to push to `refs/heads/feature-branch` on a forked repository, dynamically inject a temporary, scoped authorization token bypassing strict repository ownership.
+- [ ] Ensure `git push` access is explicitly limited *only* to the branch tied to the active PR, rejecting pushes to the fork's `main` branch or any other refs.
+- [ ] Implement deep Submodule metadata resolution inside the Git Tree API (`GET /repos/{owner}/{repo}/git/trees/{sha}`).
+- [ ] Parse `.gitmodules` continuously in the background using `gitoxide` and map the submodule SHA to the exact upstream repository URL.
+- [ ] Inject the resolved `submodule_url` dynamically into the Tree API response to allow the Angular frontend to render clickable directory links to the exact commit history of the external repository.
+- [ ] Support automated sync mutations: build an API endpoint that executes `git submodule update --remote` purely on the backend and generates an automated PR bumping the submodule pointers.
+
+### Phase 2.7: Ecosystem Edge Cases & Raw Representations
+- [ ] **Public Key Discovery Endpoints:** Implement the `GET /{username}.keys` endpoint, querying the `ssh_keys` database and returning a plaintext string of all verified, active public SSH keys separated by newlines.
+- [ ] **GPG Key Discovery Endpoints:** Implement the `GET /{username}.gpg` endpoint, returning the user's public GPG keys in armor-encoded plaintext for easy importing via `curl`.
+- [ ] **Raw Patch Output Generation:** Implement routing logic allowing users to append `.patch` to any Commit or Pull Request URL. Dynamically execute `git format-patch` natively via `gitoxide` or `libgit2` and stream the pure text response.
+- [ ] **Raw Diff Output Generation:** Implement routing logic for `.diff` suffixes on Commits and PRs, streaming the raw `git diff` output with `text/plain` content types.
+- [ ] **Actions SVG Build Badges:** Implement `GET /{owner}/{repo}/actions/workflows/{file}/badge.svg`, querying the latest Check Suite state for the default branch and utilizing `resvg` to generate a dynamic "passing/failing" SVG badge for README embeds.
+- [ ] **Commit Status Badges:** Expose generic SVG badge endpoints that render arbitrary CI/CD commit statuses (e.g., coverage percentages) based on the latest commit hash.
+- [ ] **Redirect Edge Cases:** Implement the explicit redirect mapping logic: if a user navigates to a repository that has been renamed, strictly issue a `301 Moved Permanently` to the new path to prevent breaking existing ecosystem hyperlinks.
+
+### 0.10 Developer Portal & App Lifecycle APIs
+- [ ] **App Registration Schema:** Define `github_apps` Postgres table: `id`, `name`, `slug` (unique constraint), `description`, `owner_id`, `public` (boolean), `webhook_url`, `webhook_secret`.
+- [ ] **Granular Permissions Storage:** Define the `github_app_permissions` JSONB column to rigidly store the 50+ granular `Read/Write/None` scope assertions defined during app creation.
+- [ ] **Installation Mapping Schema:** Define `github_app_installations` Postgres table linking an App to specific user/org accounts, explicitly tracking `repository_selection` (all vs selected) and mapping selected IDs in a join table.
+- [ ] **Manifest Conversion API:** Implement the `POST /app-manifests/{code}/conversions` endpoint to support the GitHub App Manifest creation flow natively from web browsers via deep-linking.
+- [ ] **PKI & RSA Key Generation:** Build the RSA Keypair generator in Rust utilizing the `rsa` and `pkcs8` crates: dynamically generate 2048-bit RSA keys when an admin requests a new client secret.
+- [ ] **Ephemeral Private Key Streaming:** Ensure the backend stores *only* the public key and its SHA-256 fingerprint in Postgres; securely stream the generated `.pem` private key directly to the HTTP response one time, dropping it entirely from server memory.
+- [ ] **Public Key Rotation (JWKS):** Expose a `/.well-known/jwks.json` endpoint publishing all active public keys for the App to support OIDC verification by external identity providers.
+- [ ] **Client Secret CSPRNG:** Implement the `ClientSecret` generator utilizing cryptographically secure pseudorandom number generators (e.g., `rand::rngs::OsRng`), returning a 40-character hex string.
+- [ ] **Secret Hashing:** Store only `argon2` or `bcrypt` hashed versions of the Client Secret in the database to prevent lateral movement if the database is compromised.
+- [ ] **App Installation Token Vending:** Implement the `POST /app/installations/{id}/access_tokens` endpoint, generating short-lived JWTs (1 hour max).
+- [ ] **Intersection Permissions:** In the token vendor, dynamically intersect the App's global permissions against the specific installation's granted access to compute the final, minimal set of claims for the vended token.
+- [ ] **App Deletion & Revocation:** Create administrative endpoints to suspend or delete GitHub App installations, instantly removing them from Postgres and dispatching a Redis broadcast to instantly invalidate all active vended JWTs globally.
+- [ ] **Webhook Event Mapping:** Implement the strict validation layer ensuring an App cannot subscribe to webhook events (e.g., `pull_request`) if it has not been granted the prerequisite API permissions (e.g., `pull_requests: read`).
+- [ ] **App Rate Limiting Mitigation:** Configure the `governor` rate limit logic in Rust to apply a distinct, significantly higher quota bucket strictly for requests authenticated via GitHub App JWTs vs standard user PATs.
+- [ ] **Webhook Delivery Logging:** Architect the `app_webhook_deliveries` table to persist headers, payload hashes, and HTTP response codes for all outbound app webhooks, enforcing an automated 30-day deletion sweep.
+### Tier 11: Compare, Sync Fork & Legacy Statuses
+- [ ] **Commit Graph Traversal API:** Implement the `GET /repos/{owner}/{repo}/compare/{basehead}` REST endpoint natively using `gitoxide` to rapidly traverse the repository commit graph.
+- [ ] **Merge Base Computation:** Compute the common ancestor (merge base) dynamically between the two refs to accurately return the `ahead_by` and `behind_by` commit integer counts.
+- [ ] **Sync Fork Background Worker:** Build the asynchronous "Sync Fork" worker in Rust to perform a highly optimized `git fetch` from the upstream repository directly into the fork's bare repo storage.
+- [ ] **Safe Fast-Forward Engine:** Execute a safe `git merge --ff-only` or `git reset --hard` (if configured by the user) on the backend to synchronize the fork's default branch.
+- [ ] **Webhooks for Synced Forks:** Emit standard `push` webhooks after a successful fork sync so downstream CI systems linked to the fork are triggered correctly.
+- [ ] **Legacy Statuses API Endpoint:** Implement the legacy `POST /repos/{owner}/{repo}/statuses/{sha}` endpoint to maintain full backward compatibility with older CI/CD tools (e.g., TravisCI, older Jenkins plugins).
+- [ ] **State Translation Logic:** Map the legacy `state` string payload (`pending`, `success`, `error`, `failure`) dynamically into the modern `check_runs` and `check_suites` Postgres database schema.
+- [ ] **Virtual Check Suites:** Automatically generate a virtual "Check Suite" wrapper for incoming legacy statuses to ensure they render seamlessly alongside modern GitHub Actions inside the Angular PR UI.
+- [ ] **Status Rollup API:** Implement the `GET /repos/{owner}/{repo}/commits/{ref}/status` endpoint, performing a SQL rollup of all legacy statuses and modern checks into a single aggregate `state`.
+
+### Tier 11.1: Compare, Sync Fork & Ref Math Internals
+- [ ] **`gitoxide` Merge Base Resolution:** Implement lowest-common-ancestor algorithms natively in Rust. If the references share absolutely no history (unrelated histories), safely return an empty commit list and HTTP 404 instead of panicking.
+- [ ] **Extensive Commit Pagination:** For branches that are massive (e.g., 10,000 commits ahead), enforce a strict limit of returning the first 250 commits in the API response payload, returning a pagination URL for subsequent data.
+- [ ] **Fast-Forward Evaluation Engine:** During Sync Fork, utilize `gitoxide` to explicitly verify if the upstream commit is a direct descendant of the fork's current `HEAD` before attempting the write operation.
+- [ ] **Rejection Context Headers:** If the Sync Fork fast-forward fails, return a `409 Conflict` containing a custom JSON schema describing the exact conflicting files to aid the user in manual resolution.
+- [ ] **Fork Sync Branch Protection Override:** Ensure the internal Sync Fork execution strictly respects branch protection rules on the fork (e.g., bypassing review requirements only if the user holds Admin privileges).
+- [ ] **Cross-Repository Ref Specifications:** Build the ref parser to correctly identify and fetch revisions located in separate physical repositories (e.g., `upstream_owner:branch` vs `fork_owner:branch`).
+
+### Tier 11.2: Legacy Commit Statuses Emulation
+- [ ] **Legacy Schema Translation Mapping:** Explicitly map incoming `POST /statuses/{sha}` payload fields (`state`, `target_url`, `description`, `context`) into a synthesized `check_run` Postgres insertion.
+- [ ] **Context Deduplication Override:** Implement Upsert logic: if a legacy status is posted with a `context` string that already exists for that SHA, overwrite the existing status rather than appending a duplicate row.
+- [ ] **Virtual Check Suite Instantiation:** Since legacy statuses do not belong to GitHub Apps, dynamically generate an overarching "Legacy System" virtual Check Suite on-the-fly to group these statuses cleanly in the database.
+- [ ] **Hard Status Limits:** Enforce a hard ceiling of 1,000 distinct legacy status contexts per commit SHA to prevent database bloating from misconfigured CI loops.
+- [ ] **Status Rollup Algorithm:** Implement the `/commits/{ref}/status` endpoint logic in Rust: query all associated checks and legacy statuses, returning `failure` if any single check fails, `pending` if any are running, and `success` only if all are green.
+- [ ] **Pagination of Status Contexts:** Provide standard cursor-based pagination for the `GET /commits/{ref}/statuses` endpoint to support UI rendering when a single commit holds hundreds of CI status reports.
