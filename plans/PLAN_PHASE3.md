@@ -1,0 +1,103 @@
+## 3. THE DISTRIBUTED GIT DATA PLANE (PROTOCOL LEVEL)
+
+### 3.1 Gitaly RPC & Storage Sharding (Spokes/Dgit Architecture)
+- [ ] **Define `UploadPack` gRPC Protobuf schema** for fetching operations (pull/clone/fetch).
+- [ ] **Define `ReceivePack` gRPC Protobuf schema** for mutation operations (push).
+- [ ] **Define `InfoRefs` gRPC Protobuf schema** for reference and capability discovery.
+- [ ] **Define `ObjectInfo` and `CommitGraph` gRPC Protobuf schemas** for internal server-side metadata queries.
+- [ ] **Implement gRPC mutual TLS (mTLS)** authentication to encrypt traffic between API nodes and Storage nodes.
+- [ ] **Configure gRPC connection pooling and keep-alives** (TCP keepalive, HTTP/2 PING) to prevent idle connections from dropping during long git operations.
+- [ ] **Implement gRPC interceptors for distributed tracing** (OpenTelemetry) to trace multi-node repository requests.
+- [ ] **Implement gRPC interceptors for Prometheus metrics** (request duration, payload size, error rates per RPC).
+- [ ] **Implement an RPC-level rate-limiting middleware** dynamically driven by tenant/repository usage quotas.
+- [ ] **Integrate `jump-consistent-hash`** algorithm for calculating logical partition IDs from repository hashes.
+- [ ] **Implement a murmur3 hashing function** to convert repository UUID strings into numerical keys for the jump ring.
+- [ ] **Develop an in-memory routing table** that maps logical partition IDs to physical storage node gRPC endpoints.
+- [ ] **Set up etcd/ZooKeeper client integration** for dynamic storage node discovery and cluster topology management.
+- [ ] **Implement heartbeat mechanisms** for storage nodes to register their presence and disk capacity in etcd.
+- [ ] **Create a 3-node replica quorum topology** per repository (1 Primary, 2 Secondaries) based on GitHub Spokes design.
+- [ ] **Implement the Reference Transaction Hook** (`reference-transaction`) for 3-phase commits during `git push`.
+- [ ] **Implement Phase 1 (Pre-Vote):** Verify disk space, lock the repository path on all 3 nodes concurrently.
+- [ ] **Implement Phase 2 (Write):** Stream the packfile payload concurrently over RPC to all 3 nodes.
+- [ ] **Implement Phase 3 (Commit):** Execute reference updates only if >= 2 nodes (quorum) report successful pack indexing.
+- [ ] **Implement rollback and cleanup logic** if the quorum fails during Phase 1 or 2 to prevent detached objects.
+- [ ] **Implement etcd-based Leader Election** to designate a Primary replica for each partition dynamically.
+- [ ] **Implement RPC fencing tokens** to reject writes from deposed Primaries, guaranteeing split-brain protection.
+- [ ] **Build a Read-Repair heuristic** triggered during `UploadPack` to compare replica checksums of `packed-refs`.
+- [ ] **Implement asynchronous `git fetch` tasks** to heal diverging Secondaries detected via the Read-Repair mechanism.
+- [ ] **Configure Kafka topics (`repository_mutations`)** with schema registries (Avro/Protobuf) for all successful pushes.
+- [ ] **Implement Kafka Producer logic on Storage nodes** to emit events (RepoID, TransactionID, UpdatedRefs).
+- [ ] **Implement an Idempotency Key system** to ensure Kafka events are not processed multiple times.
+- [ ] **Build asynchronous Kafka Consumer workers** (the "Replicator") to continuously synchronize offline or newly provisioned nodes.
+- [ ] **Implement an exponential backoff strategy** for Replicator failures (e.g., target node still down).
+- [ ] **Implement a Dead Letter Queue (DLQ)** for replication jobs that fail repeatedly after maximum retries.
+- [ ] **Implement an automated Git Garbage Collection (`git gc`) scheduler** that runs safely on storage nodes during off-peak hours.
+- [ ] **Implement automated multi-pack-index (MIDX)** and bitmap generation during background GC for faster graph queries.
+- [ ] **Implement commit-graph file updates** during background GC to accelerate future `have`/`want` traversals.
+- [ ] **Implement a health-check endpoint on storage nodes** that rigorously verifies read/write capabilities to the underlying filesystem.
+- [ ] **Implement failover routing logic** in the API tier to instantly and transparently switch to a Secondary if the Primary times out.
+
+### 3.2 Smart HTTP (`git-httpd`) Wire Protocol Mechanics
+- [ ] **Configure Axum routing** to handle `GET /<user>/<repo>/info/refs` with dynamic URL path parameter extraction.
+- [ ] **Implement HTTP Basic Auth and OAuth Bearer token validation** middleware specifically for Git API routes.
+- [ ] **Strictly validate the `service` query parameter** to only allow `git-upload-pack` and `git-receive-pack`.
+- [ ] **Enforce `Content-Type: application/x-git-upload-pack-advertisement`** on the response for `info/refs`.
+- [ ] **Write a Pkt-Line encoder function** to perfectly format exactly 4-byte hex lengths (e.g., `001e`).
+- [ ] **Implement Pkt-Line flush packet (`0000`)** and delimiter packet (`0001`) encoding structures.
+- [ ] **Dynamically inject the `service=<service_name>` Pkt-Line header** exactly at the start of the `info/refs` stream.
+- [ ] **Implement Git Protocol v2 capability advertisement**, actively checking the `GIT_PROTOCOL` HTTP header.
+- [ ] **Expose `ls-refs`, `fetch`, `server-option`, and `object-format=sha1/sha256` capabilities** in the v2 payload.
+- [ ] **Expose the `filter` capability** to support partial clones (e.g., `--filter=blob:none`, `--filter=tree:0`).
+- [ ] **Configure Axum routing for `POST /<user>/<repo>/git-upload-pack`**.
+- [ ] **Enforce `Content-Type: application/x-git-upload-pack-request`** header validation.
+- [ ] **Handle gzip/deflate `Content-Encoding` unpacking** to seamlessly support compressed incoming POST bodies.
+- [ ] **Implement an asynchronous streaming Pkt-Line parser** to decode the incoming HTTP request body chunk-by-chunk without full memory loading.
+- [ ] **Implement state machine logic to parse standard capabilities:** `want <SHA>`, `have <SHA>`, and `deepen <depth>`.
+- [ ] **Implement Git Protocol v2 specific `command=fetch`** argument parsing.
+- [ ] **Implement DoS protection limit:** Cap maximum `want` declarations to 100,000 per request.
+- [ ] **Implement DoS protection limit:** Cap maximum `have` declarations and limit graph traversal depths to prevent CPU exhaustion.
+- [ ] **Implement an absolute timeout** (e.g., 60 seconds) strictly for the packet negotiation phase.
+- [ ] **Integrate `gitoxide` commit-graph loading** directly into the memory space of the RPC nodes.
+- [ ] **Implement fast ancestry graph traversal using `gitoxide`** by mapping `want` OIDs as targets and `have` OIDs as uninteresting boundary commits.
+- [ ] **Implement Bloom filter lookups** to rapidly bypass full commit parsing for paths/OIDs that obviously don't exist.
+- [ ] **Identify the exact minimal object set** (commits, trees, blobs) required to satisfy the negotiation graph difference.
+- [ ] **Implement dynamically generated thin-packs using `gitoxide`**, specifically omitting base objects already present in client `have` commits.
+- [ ] **Enable `--reuse-delta` fast-paths** to aggressively copy existing delta-compressed chunks directly from disk to the network buffer.
+- [ ] **Implement the Sideband-64k multiplexing state machine**.
+- [ ] **Wrap binary packfile chunks** in strict `\x01` sideband headers (maximum 65520 bytes per chunk).
+- [ ] **Implement dynamic, real-time progress stream calculation** (e.g., "Counting objects: 100% (50/50), done.").
+- [ ] **Wrap textual progress logs in `\x02` sideband headers** and stream them concurrently with pack data.
+- [ ] **Implement a panic/error capture mechanism** to cleanly send fatal errors via `\x03` sideband headers before closing the connection.
+- [ ] **Implement keep-alive packet emission** (`0005\x02`) during slow graph traversals to prevent intermediate load-balancer timeouts.
+- [ ] **Stream the final multiplexed byte stream** back through Axum utilizing `Transfer-Encoding: chunked`.
+- [ ] **Disable Nginx/HAProxy/ALB HTTP buffering** via headers (e.g., `X-Accel-Buffering: no`) to ensure real-time progress UX for the client.
+- [ ] **Implement graceful client disconnect handling** (TCP RST) to immediately interrupt and terminate backend gitoxide/packing threads.
+
+### 3.3 Git LFS & S3 Handoff
+- [ ] **Compile a standalone Rust binary** explicitly designed to act as the `pre-receive` hook inside the Storage nodes' `.git/hooks` directories.
+- [ ] **Implement STDIN reading inside the pre-receive hook** to reliably capture `old-oid new-oid refname` triples.
+- [ ] **Implement strict environment variable parsing** within the hook to securely capture `GL_ID`, `GL_REPOSITORY`, and API routing tokens injected by Gitaly.
+- [ ] **Implement `git rev-list --objects $old..$new` execution** within the hook to iterate over all newly pushed blobs.
+- [ ] **Implement a fast heuristic scanner** that checks only the first 100 bytes of new blobs for the LFS signature (`version https://git-lfs.github.com/spec/v1`).
+- [ ] **Implement strict Regex parsing for the OID** (`oid sha256:[a-f0-9]{64}`) from successfully detected LFS pointers.
+- [ ] **Implement strict Regex parsing for the object size** (`size [0-9]+`) from detected LFS pointers.
+- [ ] **Ensure pushed files matching the LFS signature but exceeding 1KB are automatically rejected** (LFS pointer spoofing protection).
+- [ ] **Perform a synchronous HTTP RPC call from the pre-receive hook** to the API node to rigorously validate LFS pointer existence and available storage quotas.
+- [ ] **Implement `POST /<user>/<repo>.git/info/lfs/objects/batch`** routing in Axum.
+- [ ] **Enforce strict validation of `Accept: application/vnd.git-lfs+json`** and `Content-Type` HTTP headers.
+- [ ] **Deserialize the Git LFS Batch JSON payload** into strict, type-safe Rust structs (`operation: upload/download`, `transfers`, `objects`).
+- [ ] **Set up a dedicated PostgreSQL connection pool** specifically optimized for LFS metadata queries.
+- [ ] **Implement an efficient bulk SQL query** utilizing `SELECT oid FROM lfs_objects WHERE oid = ANY($1) AND repo_id = $2`.
+- [ ] **Partition the client's requested OIDs into two definitive vectors:** `existing_objects` and `missing_objects`.
+- [ ] **Initialize the `aws-sdk-s3` client** securely with IAM roles, custom endpoint support (for MinIO/R2 dev parity), and correct region configs.
+- [ ] **Generate S3 Pre-Signed PUT URLs for all `missing_objects`** utilizing the AWS SDK.
+- [ ] **Configure the PUT pre-signed URL to strictly enforce** `Content-Type: application/octet-stream`.
+- [ ] **Configure the PUT pre-signed URL to cryptographically enforce** exact file sizes matching the client's reported `size`.
+- [ ] **Set a strict, non-negotiable 15-minute expiration timestamp** (`expires_at`) for all generated pre-signed URLs.
+- [ ] **Generate S3 Pre-Signed GET URLs for `existing_objects`** during standard `download` operations.
+- [ ] **Serialize the complex LFS Batch API JSON response** accurately (mapping `actions.upload.href`, `header`, and precise `expires_in` times).
+- [ ] **Implement Redis-based atomic quota increments** for the user dynamically based on the aggregate byte sizes of `missing_objects`.
+- [ ] **Implement a `POST /info/lfs/objects/verify` endpoint** to handle client post-upload verifications per the LFS specification.
+- [ ] **Validate the uploaded object in S3** using a `HeadObject` API call to definitively ensure the `Content-Length` matches the PG metadata.
+- [ ] **Atomically mark the object as `verified = true`** in the PostgreSQL `lfs_objects` table.
+- [ ] **Build a nightly cron worker to garbage-collect** (hard delete from S3) any uploaded LFS objects older than 24 hours where `verified = false`.

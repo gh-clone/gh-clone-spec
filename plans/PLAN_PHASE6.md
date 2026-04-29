@@ -1,0 +1,160 @@
+## 6. EXHAUSTIVE QA, OBSERVABILITY & THREAT MODELING
+
+### 6.1 Playwright E2E, UI Fidelity, i18n & a11y
+- [ ] **Core POM Architecture & Configuration**
+    - [ ] Configure `playwright.config.ts` with 3 retries on CI and 0 locally.
+    - [ ] Define explicit browser testing matrix: Chromium, Firefox, WebKit, and Mobile Safari emulation.
+    - [ ] Implement `BasePage.ts` with custom `waitForNetworkIdle` and `waitForDOMStable` helpers.
+    - [ ] Create `test.extend` fixtures for authenticated state injection to bypass UI login for non-auth tests.
+    - [ ] Implement specific API mock fixtures for simulating edge-case server errors (500, 502) in the UI.
+    - [ ] Configure video recording and trace viewer retention for failed tests on CI.
+- [ ] **Internationalization (i18n) & Localization Implementation**
+    - [ ] Integrate an i18n framework (e.g., `i18next` or `react-intl`) and configure dynamic loading of translation namespaces.
+    - [ ] Extract all hardcoded UI strings into JSON language files (e.g., `en-US.json`, `es-ES.json`, `ja-JP.json`).
+    - [ ] Implement user locale detection based on the `Accept-Language` HTTP header, with user settings override.
+    - [ ] Implement ICU Message Format for complex pluralization (e.g., "0 commits", "1 commit", "2 commits").
+    - [ ] Replace hardcoded dates with `Intl.DateTimeFormat` and `Intl.RelativeTimeFormat` to support localized relative times (e.g., "2 hours ago" vs "hace 2 horas").
+    - [ ] Implement Right-to-Left (RTL) support using CSS logical properties (`margin-inline-start`, `padding-block`) and `dir="rtl"` attribute.
+- [ ] **i18n Playwright Testing**
+    - [ ] Write tests to switch user language settings via the UI and assert translation application without page reloads.
+    - [ ] Test date/time rendering across at least 3 distinct timezones and locales using Playwright's `timezoneId` and `locale` context options.
+    - [ ] Verify UI layout integrity and overflow handling in RTL mode (e.g., Arabic).
+- [ ] **Accessibility (a11y) Implementation**
+    - [ ] Enforce `eslint-plugin-jsx-a11y` in the CI pipeline to catch structural accessibility issues at build time.
+    - [ ] Implement "Skip to content" anchor links for screen reader navigation bypassing the header.
+    - [ ] Implement explicit focus trapping inside all modal dialogs (e.g., Command Palette `Cmd+K`, Review Dialogs).
+    - [ ] Ensure all dynamic notifications (Toasts, status check updates) use `aria-live="polite"` or `aria-live="assertive"`.
+    - [ ] Ensure all decorative SVG icons have `aria-hidden="true"` and functional icons have `<title>` or `aria-label`.
+    - [ ] Enforce WCAG 2.1 AA compliance for color contrast, especially in code syntax highlighting and dark mode diffs.
+- [ ] **a11y Playwright Testing & Validation**
+    - [ ] Integrate `@axe-core/playwright` and assert 0 violations on all major pages (Repository homepage, PR view, Settings).
+    - [ ] Write a dedicated "Keyboard Only" Playwright test: navigate from repo homepage -> create PR -> submit review -> merge PR entirely using `page.keyboard.press()`.
+    - [ ] Verify `aria-expanded` state toggles accurately on the "Code" clone dropdown and other nested menus.
+    - [ ] Verify `aria-invalid` states on repository creation form when an existing name is typed.
+    - [ ] Verify standard keyboard shortcuts: `t` for file finder, `w` for branch switcher, `Cmd+Enter` for submitting comments.
+    - [ ] Verify focus rings (`:focus-visible`) are correctly styled with the standard blue outline and never suppressed via `outline: none` without a fallback.
+- [ ] **Pull Request Pages (`PullRequestPage.ts`)**
+    - [ ] Abstract DOM locators using GitHub's specific `js-*` classes and `data-testid` attributes.
+    - [ ] Implement helper to assert the "Reviewers" sidebar autocomplete dropdown behavior and filtering.
+    - [ ] Implement helper for adding/removing labels and verifying the exact hex color renders in the DOM.
+    - [ ] Write test for Draft PR creation, specifically checking the gray draft icon rendering.
+    - [ ] Write test for "Ready for Review" conversion, checking the green open icon and timeline event generation.
+    - [ ] Write test for "Merge Pull Request" squashing, verifying the default commit message combines all PR commits.
+    - [ ] Write test for cross-repository fork PR creation, verifying the base/head repository dropdowns.
+- [ ] **Code Navigation & Blob Viewing (`CodeNavPage.ts`)**
+    - [ ] Test the file tree pane state preservation (scroll position and open folders) on browser back navigation.
+    - [ ] Verify the "Copy raw contents" button writes the exact file string to the clipboard (`navigator.clipboard.readText`).
+    - [ ] Test the "Blame" toggle, asserting the left gutter renders correct commit SHAs and author avatars per line.
+    - [ ] Test syntax highlighting applies correct CSS classes (e.g., `.pl-k` for keywords) based on language linguist detection.
+    - [ ] Test rich file rendering for CSVs (table view), SVGs, and Images (diff swipe view).
+    - [ ] Test the "Find in file" (`Cmd+F`) custom search bar overlay overriding the default browser search.
+- [ ] **Review & Commenting Workflows (High-Fidelity)**
+    - [ ] Test line-level commenting by hovering over gutter, clicking the blue `+`, and typing in the Markdown editor.
+    - [ ] Toggle between "Unified" and "Split" diff views, asserting line comments anchor to the correct side.
+    - [ ] Test replying to an existing comment thread, verifying the visual nesting indentation.
+    - [ ] Test resolving a conversation thread, asserting the thread collapses and the "Resolved" badge appears.
+    - [ ] Test unresolving a conversation, asserting the thread re-expands.
+    - [ ] Test reaction emojis (👍, 👎, 🚀) on comments, verifying the counter increments and the active state toggles.
+    - [ ] Verify GitHub-flavored Markdown rendering in the preview tab (tables rendering with borders, task lists rendering as checkboxes).
+    - [ ] Verify `@` mentions trigger the user auto-suggest popover and render as user profile links.
+    - [ ] Test the "Review Changes" dropdown states (Approve, Request Changes, Comment) and form submission.
+- [ ] **Real-time Updates (WebSockets/SSE) Replication**
+    - [ ] Intercept WebSocket `/cable` or SSE endpoints using Playwright's `page.route` to mock real-time payloads.
+    - [ ] Simulate receiving a "CI Pending" payload and assert the yellow circle icon appears without page reload.
+    - [ ] Simulate receiving a "CI Success" payload and assert the green checkmark appears and the Merge button enables.
+    - [ ] Simulate receiving a new timeline comment payload and assert it injects at the bottom of the timeline dynamically.
+    - [ ] Simulate "Review requested" real-time event and verify the reviewer appears in the right sidebar instantly.
+
+### 6.2 Telemetry, Tracing & Context Propagation
+- [ ] **Distributed Tracing Implementation (OpenTelemetry)**
+    - [ ] Integrate `tracing-opentelemetry` crate into the Rust Axum API backend.
+    - [ ] Integrate `@opentelemetry/auto-instrumentations-node` for specific Node.js microservices.
+    - [ ] Configure OpenTelemetry Collector to export traces in OTLP format over gRPC to the telemetry backend.
+    - [ ] Propagate standard W3C headers (`traceparent`, `tracestate`) across HTTP boundaries.
+    - [ ] Propagate trace context inside Kafka record headers for background jobs (e.g., webhook delivery).
+    - [ ] Create explicit spans for PostgreSQL transactions, capturing the parameterized SQL query string (excluding values).
+    - [ ] Create explicit spans for Redis Cache interactions, categorizing by Hits, Misses, and Evictions.
+    - [ ] Create explicit spans for Git subprocess executions (e.g., `git-receive-pack`).
+    - [ ] Inject `user.id`, `repository.id`, and `organization.id` as span attributes for tier-based tracing.
+    - [ ] Ensure span attributes scrub all Personally Identifiable Information (PII) like email addresses.
+- [ ] **Metrics Collection & Prometheus Export**
+    - [ ] Expose a `/metrics` endpoint in Prometheus format on a dedicated internal port (e.g., 9090).
+    - [ ] Track HTTP request duration in a histogram (`github_api_request_duration_seconds`) with explicit buckets (0.01, 0.05, 0.1, 0.5, 1, 5).
+    - [ ] Track HTTP request totals categorized by route, method, and status code.
+    - [ ] Track Git-specific metrics: measure `git-rev-list` execution time.
+    - [ ] Track Git-specific metrics: measure `git pack-objects` memory consumption and duration.
+    - [ ] Track Git-specific metrics: log object delta depth averages per push.
+    - [ ] Track background job queue depth, processing latency, and dead-letter queue (DLQ) sizes.
+    - [ ] Track PostgreSQL connection pool exhaustion events.
+- [ ] **Internal Observability Dashboards (Grafana)**
+    - [ ] Create "API Golden Signals" dashboard (Latency, Traffic, Errors, Saturation).
+    - [ ] Create "Git Infrastructure" dashboard displaying 99th percentile clone/fetch times.
+    - [ ] Create "Database Health" dashboard showing active connections, transaction rollback rates, and slow queries.
+    - [ ] Create "WebSocket Connections" dashboard showing active client counts and message throughput.
+    - [ ] Create "Storage Nodes" dashboard displaying IOPS, disk utilization, and packfile sizes.
+- [ ] **Continuous Profiling in Rust (`pprof-rs`)**
+    - [ ] Embed the `pprof` crate in the core Rust API binaries.
+    - [ ] Configure an OS signal handler (e.g., `SIGUSR1`) to trigger a 30-second CPU profile.
+    - [ ] Write the resulting CPU profile to disk as a collapsed stack format (for flamegraphs).
+    - [ ] Implement an admin-only authenticated endpoint `/api/internal/debug/pprof/heap` to dump jemalloc heap profiles.
+    - [ ] Write a CI script to automate generating a flamegraph during simulated load testing to catch performance regressions.
+- [ ] **Structured Logging & Audit Trails**
+    - [ ] Enforce 100% structured JSON logging across all backend services via `tracing-subscriber`.
+    - [ ] Define a strict JSON schema requiring `timestamp` (ISO8601), `level`, `target`, `span_id`, and `trace_id`.
+    - [ ] Generate an `X-GitHub-Request-Id` (UUIDv4) at the NGINX ingress layer.
+    - [ ] Ensure the `X-GitHub-Request-Id` is included in all downstream logs and returned in the HTTP response header.
+    - [ ] Implement a regex-based log sanitization middleware to scrub GitHub PATs (`ghp_...`, `gho_...`).
+    - [ ] Implement log sanitization to scrub OAuth access tokens and session cookie values before writing to standard out.
+    - [ ] Forward sanitized logs to a centralized aggregation service (e.g., Elasticsearch/Loki) via Vector or FluentBit.
+
+### 6.3 Security Threat Model (STRIDE) & GitHub-Parity Mitigations
+- [ ] **Authentication, Spoofing & Session Management**
+    - [ ] Enforce Ed25519, RSA (minimum 2048-bit), and ECDSA validation for all uploaded SSH keys.
+    - [ ] Reject compromised or weak SSH keys using a known-vulnerable key blocklist.
+    - [ ] Implement precise WebAuthn (FIDO2) ceremonies using `navigator.credentials.create()` for security key registration.
+    - [ ] Implement WebAuthn `navigator.credentials.get()` for two-factor login challenges.
+    - [ ] Generate and validate 16-character alphanumeric recovery codes, enforcing a one-time-use policy.
+    - [ ] Enforce `Strict` SameSite cookie attributes, `Secure` flags, and `HttpOnly` on all session cookies.
+    - [ ] Parse raw GPG signatures from Git commit objects using an internal keyring service.
+    - [ ] Validate x.509 (S/MIME) certificates attached to commits against a trusted root CA.
+    - [ ] Ensure the UI precisely renders the "Verified", "Unverified", or "Partially Verified" badges based on signature trust chains.
+- [ ] **Integrity, Tampering & Branch Protections**
+    - [ ] Implement the "Require linear history" branch protection rule by rejecting pushes containing merge commits via `pre-receive` hook.
+    - [ ] Implement the "Require signed commits" branch protection rule by rejecting commits with null/invalid signatures in the `pre-receive` hook.
+    - [ ] Implement "Require status checks to pass" by verifying required CI contexts exist and are 'success' before allowing a merge.
+    - [ ] Configure distributed storage nodes to run `git fsck` periodically.
+    - [ ] Verify Git SHA-1/SHA-256 object hashes on disk reads, failing the read closed and triggering an alert on hash mismatch.
+    - [ ] Setup strict read-only PostgreSQL database replicas for all `GET` API endpoints to physically prevent tampering during read operations.
+- [ ] **Auditability & Repudiation Mitigations**
+    - [ ] Design the PostgreSQL `audit_logs` table schema (actor_id, action_id, timestamp, resource_id, metadata JSONB).
+    - [ ] Enforce append-only constraints on the `audit_logs` table via database-level triggers or roles.
+    - [ ] Partition the `audit_logs` table by month to optimize retention policies and query performance.
+    - [ ] Log precise IP address, standard User-Agent, and GeoIP location resolution for all authentication events.
+    - [ ] Emit all audit log rows securely to an internal Kafka topic for ingestion by a SIEM (e.g., Splunk, Datadog).
+    - [ ] Implement a user-facing "Security log" UI in repository and user settings, perfectly matching GitHub's chronological event history.
+- [ ] **Isolation, SSRF, & Information Disclosure Prevention**
+    - [ ] Isolate the execution of GitHub-Flavored Markdown (GFM) rendering to prevent memory reading or path traversal.
+    - [ ] Run the GFM renderer inside a specific WebAssembly container or `libmountsandbox` environment.
+    - [ ] Apply `seccomp` filters to the sandbox to explicitly block `execve`, `open`, and network syscalls.
+    - [ ] Implement Server-Side Request Forgery (SSRF) protections for outgoing webhooks (block local IPs, 169.254.x.x, 127.x.x.x).
+    - [ ] Implement a pre-receive hook for real-time Secret Scanning on `git push`.
+    - [ ] Write exact regex matchers for AWS Access Keys (`AKIA...`), GitHub PATs (`ghp_...`), and Slack Bot Tokens.
+    - [ ] Reject pushes containing secrets with a terminal error message matching GitHub's exact push rejection text.
+    - [ ] Enforce strict Authorization checks for Repository visibility (Public vs. Private) at the GraphQL node-resolver layer.
+    - [ ] Enforce strict Authorization checks at the REST API middleware layer, failing with a generic `404 Not Found` (instead of `403`) to prevent repository existence leakage.
+    - [ ] Implement strict Content Security Policy (CSP) headers blocking inline scripts (`script-src 'self'`).
+- [ ] **Rate Limiting & Denial of Service (DDoS)**
+    - [ ] Configure Cloudflare/AWS Shield Web Application Firewall (WAF) rules for volumetric Layer 3/4 attacks.
+    - [ ] Implement exact GitHub REST API Rate Limiting headers: `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-used`, `x-ratelimit-reset`.
+    - [ ] Use Redis Lua scripts to ensure atomic token bucket deduction for rate limits.
+    - [ ] Implement GraphQL rate limiting based on a complex query cost calculation (nodes + edges), not just request counts.
+    - [ ] Implement a custom Axum `ConcurrencyLimitLayer` specifically for the `/git-upload-pack` and `/git-receive-pack` endpoints.
+    - [ ] Protect against "Git Bomb" attacks by limiting max tree depth to 50 and rejecting deeply nested Git trees.
+    - [ ] Protect against Git bombs by enforcing a strict maximum size (e.g., 2GB) per individual Git object inside a push.
+    - [ ] Enforce repository-level storage quotas (e.g., 10GB limit) and reject pushes that exceed the quota.
+- [ ] **Elevation of Privilege Protections**
+    - [ ] Implement strict Role-Based Access Control (RBAC) mimicking GitHub's exact permission tiers: Read, Triage, Write, Maintain, Admin.
+    - [ ] Ensure fine-grained permissions map correctly to actions (e.g., 'Triage' can manage issues but cannot push code).
+    - [ ] Provision temporary, short-lived `GITHUB_TOKEN`s for CI/CD pipeline workers.
+    - [ ] Scope `GITHUB_TOKEN` permissions strictly to the executing repository unless explicitly overridden in the workflow file.
+    - [ ] Ensure `GITHUB_TOKEN`s are automatically revoked and deleted from the database the millisecond the CI job completes.

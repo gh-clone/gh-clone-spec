@@ -1,0 +1,239 @@
+# THE ULTIMATE BLUEPRINT: 100% FEATURE-PARITY GITHUB REPLICA
+**Version:** 8.1 (The Definitive Engineering Whitepaper & Specification)
+**Objective:** Architect, implement, and deploy a 100% feature-parity clone of GitHub. This system must act as an exact drop-in replacement for the GitHub ecosystem (`gh` CLI, Actions, APIs, IDE integrations). The architecture guarantees **Universal Portability**: scaling from a statically-compiled, zero-config single binary on a Raspberry Pi up to a globally distributed Kubernetes cluster handling 10,000+ concurrent requests per second.
+
+---
+
+## Phase 0: Foundation, Architecture, & Environment Setup
+
+### 0.1 Codebase Initialization & Dev Environment
+- [ ] Initialize `go.mod` specifying Go version 1.22+.
+- [ ] Define module path as `github.com/replica/core`.
+- [ ] Create `cmd/replica/main.go` as the primary single-binary entrypoint.
+- [ ] Configure `.golangci.yml` to strictly enforce `gosec` for security static analysis.
+- [ ] Configure `.golangci.yml` to enforce `errcheck` for unhandled errors.
+- [ ] Configure `.golangci.yml` to enforce `revive` for general linting rules.
+- [ ] Create `.editorconfig` with `indent_style = space` and `indent_size = 4` for Go files.
+- [ ] Write `Makefile` target `build` executing `go build -ldflags="-s -w"`.
+- [ ] Write `Makefile` target `test` executing `go test -race -cover ./...`.
+- [ ] Write `Makefile` target `lint` executing `golangci-lint run`.
+- [ ] Write `Makefile` target `clean` to remove `dist/` and `tmp/` directories.
+- [ ] Setup `air` (`.air.toml`) for hot-reloading during local development.
+- [ ] Create `.dockerignore` excluding `.git`, `tmp`, and local database files.
+- [ ] Create multi-stage `Dockerfile`: `builder` stage using `golang:1.22-alpine`.
+- [ ] Create multi-stage `Dockerfile`: `final` stage using `scratch` (empty filesystem).
+- [ ] Configure `CGO_ENABLED=1` flag in build matrix specifically for SQLite native bindings.
+- [ ] Setup static asset embedding via `go:embed` for the `web/public` directory.
+- [ ] Initialize `internal/config` package to hold singleton struct `ServerConfig`.
+- [ ] Integrate `spf13/viper` to parse configuration from `replica.yaml`.
+- [ ] Map environment variable prefix `REPLICA_` to all Viper configuration keys.
+- [ ] Create struct field `Config.Database.DSN` for connection string.
+- [ ] Create struct field `Config.Server.Port` defaulting to `8080`.
+- [ ] Create struct field `Config.Git.BinPath` defaulting to `/usr/bin/git`.
+- [ ] Create struct field `Config.Security.SecretKey` for HMAC signing.
+- [ ] Create standard `.gitignore` targeting standard Go, OS, and IDE artifacts.
+- [ ] Write `cmd/replica/cmd_serve.go` using `spf13/cobra` to start the HTTP server.
+- [ ] Write `cmd/replica/cmd_migrate.go` for running database migrations manually.
+- [ ] Write `cmd/replica/cmd_doctor.go` to validate system dependencies (Git binary, SSH keys).
+- [ ] Write `cmd/replica/cmd_admin_create.go` to bootstrap the first root user.
+- [ ] Setup pre-commit hooks natively via `.git/hooks/pre-commit` to run `make lint`.
+- [ ] Create `scripts/seed.go` to insert 100 fake users and repositories into the local DB.
+- [ ] Setup `dependabot.yml` for automated Go module dependency updates.
+- [ ] Create `.github/workflows/ci.yml` to trigger `make test` on PRs.
+- [ ] Create `.github/workflows/build.yml` to test cross-compilation (linux/amd64, linux/arm64, darwin/arm64).
+- [ ] Write test helper `testutil.NewDB()` to spin up an in-memory SQLite DB for unit testing.
+- [ ] Write test helper `testutil.NewTempRepo()` to initialize an isolated bare git repo per test.
+
+### 0.2 Database Architecture & Schema Definitions (V1 Migrations)
+- [ ] Initialize `golang-migrate/migrate` library for executing `.sql` files.
+- [ ] Write migration `0001_create_users_table.up.sql`.
+- [ ] Define `users.id` as `BIGSERIAL PRIMARY KEY`.
+- [ ] Define `users.login` as `VARCHAR(39) UNIQUE NOT NULL` matching GitHub username constraints.
+- [ ] Define `users.email` as `VARCHAR(255) UNIQUE NOT NULL`.
+- [ ] Define `users.password_hash` as `VARCHAR(255)`.
+- [ ] Define `users.type` as `VARCHAR(10)` (ENUM: 'User', 'Organization', 'Bot').
+- [ ] Define `users.created_at` as `TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`.
+- [ ] Define `users.updated_at` as `TIMESTAMP WITH TIME ZONE`.
+- [ ] Write migration `0002_create_repositories_table.up.sql`.
+- [ ] Define `repositories.id` as `BIGSERIAL PRIMARY KEY`.
+- [ ] Define `repositories.owner_id` as `BIGINT REFERENCES users(id) ON DELETE CASCADE`.
+- [ ] Define `repositories.name` as `VARCHAR(100) NOT NULL`.
+- [ ] Create unique composite index on `(owner_id, name)` for repositories.
+- [ ] Define `repositories.description` as `TEXT`.
+- [ ] Define `repositories.default_branch` as `VARCHAR(255) DEFAULT 'main'`.
+- [ ] Define `repositories.is_private` as `BOOLEAN DEFAULT false`.
+- [ ] Define `repositories.is_fork` as `BOOLEAN DEFAULT false`.
+- [ ] Define `repositories.fork_id` as `BIGINT REFERENCES repositories(id) NULL`.
+- [ ] Write migration `0003_create_ssh_keys_table.up.sql`.
+- [ ] Define `ssh_keys.id` as `BIGSERIAL PRIMARY KEY`.
+- [ ] Define `ssh_keys.user_id` as `BIGINT REFERENCES users(id) ON DELETE CASCADE`.
+- [ ] Define `ssh_keys.fingerprint` as `VARCHAR(255) UNIQUE NOT NULL`.
+- [ ] Define `ssh_keys.content` as `TEXT NOT NULL`.
+- [ ] Write migration `0004_create_access_tokens_table.up.sql`.
+- [ ] Define `access_tokens.id` as `BIGSERIAL PRIMARY KEY`.
+- [ ] Define `access_tokens.user_id` as `BIGINT REFERENCES users(id) ON DELETE CASCADE`.
+- [ ] Define `access_tokens.token_hash` as `VARCHAR(64) UNIQUE NOT NULL`.
+- [ ] Define `access_tokens.scopes` as `TEXT[]` (Array of strings).
+- [ ] Define `access_tokens.expires_at` as `TIMESTAMP WITH TIME ZONE`.
+- [ ] Write migration `0005_create_issues_table.up.sql`.
+- [ ] Define `issues.id` as `BIGSERIAL PRIMARY KEY`.
+- [ ] Define `issues.repo_id` as `BIGINT REFERENCES repositories(id) ON DELETE CASCADE`.
+- [ ] Define `issues.number` as `INTEGER NOT NULL`.
+- [ ] Create unique composite index on `(repo_id, number)` for issues.
+- [ ] Define `issues.author_id` as `BIGINT REFERENCES users(id)`.
+- [ ] Define `issues.title` as `VARCHAR(255) NOT NULL`.
+- [ ] Define `issues.body` as `TEXT`.
+- [ ] Define `issues.state` as `VARCHAR(20) DEFAULT 'open'` (ENUM: 'open', 'closed').
+- [ ] Write migration `0006_create_pull_requests_table.up.sql`.
+- [ ] Define `pull_requests.issue_id` as `BIGINT REFERENCES issues(id) PRIMARY KEY` (1:1 with issue).
+- [ ] Define `pull_requests.head_repo_id` as `BIGINT REFERENCES repositories(id)`.
+- [ ] Define `pull_requests.head_branch` as `VARCHAR(255) NOT NULL`.
+- [ ] Define `pull_requests.base_repo_id` as `BIGINT REFERENCES repositories(id)`.
+- [ ] Define `pull_requests.base_branch` as `VARCHAR(255) NOT NULL`.
+- [ ] Write migration `0007_create_stars_table.up.sql`.
+- [ ] Define `stars.user_id` as `BIGINT REFERENCES users(id)`.
+- [ ] Define `stars.repo_id` as `BIGINT REFERENCES repositories(id)`.
+- [ ] Create unique composite index on `(user_id, repo_id)` for stars.
+- [ ] Create abstract `db.Driver` interface to support multiple SQL dialects.
+- [ ] Implement `db.SQLiteDriver` utilizing `mattn/go-sqlite3`.
+- [ ] Configure SQLite PRAGMA `journal_mode=WAL` for high concurrent performance.
+- [ ] Configure SQLite PRAGMA `synchronous=NORMAL` for optimized disk I/O.
+- [ ] Configure SQLite PRAGMA `foreign_keys=ON` to enforce relations.
+- [ ] Implement `db.PostgresDriver` utilizing `jackc/pgx/v5`.
+- [ ] Set Postgres connection pool `MaxConns` to 50 for clustered deployments.
+
+### 0.3 Core API HTTP Server & Middleware Strict Parity
+- [ ] Initialize `chi.Mux` router for strict, zero-allocation path routing.
+- [ ] Configure core HTTP server `ReadTimeout` to `10s` to prevent slow-loris attacks.
+- [ ] Configure core HTTP server `WriteTimeout` to `30s` to cap maximum response duration.
+- [ ] Configure core HTTP server `IdleTimeout` to `120s` for keep-alive connections.
+- [ ] Implement `NotFound` handler returning exactly `{"message": "Not Found", "documentation_url": "https://docs.github.com/rest"}`.
+- [ ] Implement `MethodNotAllowed` handler returning `{"message": "Not Found"}` (GitHub masks 405s as 404s for security).
+- [ ] Write `RequestIDMiddleware` that injects a UUIDv4 into `X-GitHub-Request-Id` response header.
+- [ ] Write `TimezoneMiddleware` parsing the `Time-Zone` HTTP header and attaching location data to request context.
+- [ ] Write `VersionMiddleware` requiring `X-GitHub-Api-Version: 2022-11-28` for explicit versioned endpoints.
+- [ ] Write `ContentNegotiationMiddleware` enforcing `Accept: application/vnd.github+json`.
+- [ ] Write `CORSMiddleware` injecting `Access-Control-Allow-Origin: *`.
+- [ ] Write `CORSMiddleware` injecting `Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE`.
+- [ ] Write `CORSMiddleware` injecting `Access-Control-Expose-Headers: ETag, Link, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval`.
+- [ ] Implement `PaginationMiddleware` reading `?page=` and `?per_page=` (max 100).
+- [ ] Implement Link header generator constructing exact `<url>; rel="next", <url>; rel="last"` pagination formats.
+- [ ] Write `RateLimitMiddleware` using an in-memory token bucket (or Redis fallback).
+- [ ] Inject header `X-RateLimit-Limit` natively matching GitHub's 5000/hour authenticated limit.
+- [ ] Inject header `X-RateLimit-Remaining` accurately tracking context consumption.
+- [ ] Inject header `X-RateLimit-Reset` formatted as absolute Unix epoch seconds.
+- [ ] Inject header `X-RateLimit-Resource` categorized as `core`, `search`, or `graphql`.
+- [ ] Write `RecoveryMiddleware` that catches panics and returns a generic `500 Internal Server Error` without leaking stack traces to the client.
+- [ ] Write `LoggerMiddleware` outputting structured JSON logs for every request (`method`, `path`, `status`, `duration_ms`, `ip`).
+- [ ] Write `ETagMiddleware` calculating MD5 of the finalized JSON response payload.
+- [ ] Implement 304 Not Modified handler verifying `If-None-Match` request headers against computed ETag.
+- [ ] Implement JSON validation strictly returning `422 Unprocessable Entity` for invalid field types.
+- [ ] Define standard `APIError` Go struct matching GitHub error schema: `{ "message": string, "errors": []{ "resource": string, "field": string, "code": string } }`.
+- [ ] Map all 401 Unauthorized errors to `{"message": "Bad credentials"}` string exactly.
+
+### 0.4 Git Smart HTTP Protocol Implementation
+- [ ] Register base route: `GET /{owner}/{repo}.git/info/refs`.
+- [ ] Register base route: `POST /{owner}/{repo}.git/git-upload-pack`.
+- [ ] Register base route: `POST /{owner}/{repo}.git/git-receive-pack`.
+- [ ] Implement protocol parser for `/info/refs`: read `?service=` query parameter.
+- [ ] Enforce 403 Forbidden if `service` is missing or not `git-upload-pack` or `git-receive-pack`.
+- [ ] Set `Content-Type: application/x-git-{service}-advertisement` on `/info/refs` response.
+- [ ] Implement pkt-line formatting: calculate exactly 4-byte hex lengths for every protocol line.
+- [ ] Write initial service packet: `001e# service=git-upload-pack\n0000`.
+- [ ] Call `git {service} --stateless-rpc --advertise-refs {repo_path}` and stream output directly to HTTP response.
+- [ ] Implement capability advertisement parser to detect Git Wire Protocol v2 requests (`Git-Protocol: version=2` header).
+- [ ] Validate `Content-Type: application/x-git-upload-pack-request` on POST bodies.
+- [ ] Parse POST body stream and pipe directly to `git upload-pack --stateless-rpc {repo_path}`.
+- [ ] Validate `Content-Type: application/x-git-receive-pack-request` on POST bodies.
+- [ ] Parse POST body stream and pipe directly to `git receive-pack --stateless-rpc {repo_path}`.
+- [ ] Implement zero-copy byte streaming using `io.Copy` between HTTP request body and Git standard input.
+- [ ] Implement zero-copy byte streaming using `io.Copy` between Git standard output and HTTP response writer.
+- [ ] Write HTTP middleware specific to `.git` paths to bypass standard JSON authentication and use Basic Auth (Username + PAT).
+- [ ] Implement HTTP 401 challenge: `WWW-Authenticate: Basic realm="GitHub"` if `.git` request lacks auth headers.
+- [ ] Implement parser for `git push -o <option>` capability over HTTP.
+- [ ] Configure `http.Flusher` to immediately flush Git progression packets (e.g., `Counting objects: 100%`) to prevent client timeouts.
+
+### 0.5 SSH Server & Git Multiplexer
+- [ ] Import `github.com/gliderlabs/ssh` to construct the embedded SSH daemon.
+- [ ] Configure SSH server to listen on port `22` (or configurable alternative).
+- [ ] Generate default ed25519 host key for the server on first boot if `ssh_host_ed25519_key` doesn't exist.
+- [ ] Define `PublicKeyHandler` callback to authenticate incoming connections.
+- [ ] Extract public key from incoming connection, calculate SHA256 fingerprint.
+- [ ] Query `ssh_keys` database table for matching fingerprint.
+- [ ] Reject connection if key is not found or associated user is suspended.
+- [ ] Map authenticated user struct into the SSH `Session.Context()`.
+- [ ] Define `SessionHandler` to parse the SSH "exec" payload (the command sent by the git client).
+- [ ] Parse exec payload matching `git-upload-pack '{repo_path}'`.
+- [ ] Parse exec payload matching `git-receive-pack '{repo_path}'`.
+- [ ] Enforce strict regex validation on `{repo_path}` to prevent directory traversal (`^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$`).
+- [ ] Parse the `{owner}` and `{repo}` from the `{repo_path}` string.
+- [ ] Query database to check if user has read permission (for upload-pack) or write permission (for receive-pack) on the requested repo.
+- [ ] Drop SSH connection with explicit error message if permissions are insufficient.
+- [ ] Execute `git-upload-pack {actual_disk_path}` via `exec.Command`.
+- [ ] Pipe SSH `Session` (which implements `io.Reader`/`io.Writer`) directly to the Git subprocess `Stdin`, `Stdout`, and `Stderr`.
+- [ ] Wait for Git subprocess to exit and capture its exit code.
+- [ ] Send corresponding SSH exit status packet to client to terminate cleanly.
+- [ ] Implement pseudo-TTY allocation rejection (PTY requests should fail gracefully, as this is a Git server, not a shell).
+- [ ] Implement `KeepAlive` mechanism sending empty packets to prevent load balancers from dropping long-running git clones.
+- [ ] Implement fallback interactive shell message: if user connects without an exec command (`ssh git@replica`), print "Hi {username}! You've successfully authenticated, but Replica does not provide shell access." and close connection.
+
+### 0.6 Storage Interfaces & Bare Repo Management
+- [ ] Define `storage.GitProvider` interface.
+- [ ] Define `storage.GitProvider.InitBareRepo(ctx context.Context, owner, name string) error`.
+- [ ] Define `storage.GitProvider.DeleteRepo(ctx context.Context, owner, name string) error`.
+- [ ] Define `storage.GitProvider.GetRepoPath(owner, name string) string`.
+- [ ] Implement `storage.LocalGitProvider` which stores repositories in a configured `/var/lib/replica/data/repositories` directory.
+- [ ] Ensure `InitBareRepo` executes `git init --bare --initial-branch=main {path}`.
+- [ ] Execute `git config core.logallrefupdates true` on newly initialized bare repos.
+- [ ] Implement directory hashing to avoid filesystem limits: store repo `user/project` at `data/repositories/u/s/user/p/r/project.git`.
+- [ ] Define `storage.BlobProvider` interface for avatars, attachments, and Git LFS objects.
+- [ ] Define `storage.BlobProvider.Put(ctx context.Context, bucket, key string, r io.Reader) error`.
+- [ ] Define `storage.BlobProvider.Get(ctx context.Context, bucket, key string) (io.ReadCloser, error)`.
+- [ ] Implement `storage.LocalBlobProvider` storing files to disk.
+- [ ] Implement `storage.S3BlobProvider` utilizing `aws-sdk-go-v2/service/s3`.
+- [ ] Write pre-receive Git hook binary (`replica-hook-pre-receive`).
+- [ ] Write update Git hook binary (`replica-hook-update`).
+- [ ] Write post-receive Git hook binary (`replica-hook-post-receive`).
+- [ ] Configure `LocalGitProvider.InitBareRepo` to symlink all hooks in the new repo's `hooks/` directory to the replica hook binaries.
+- [ ] Design internal RPC endpoint `POST /internal/api/pre-receive` for hooks to query the replica server for branch protection validation.
+- [ ] Design internal RPC endpoint `POST /internal/api/post-receive` for hooks to trigger webhook deliveries and database ref synchronization.
+
+### 0.7 Authentication, Cryptography, & Security
+- [ ] Implement `crypto.HashPassword(password string) (string, error)` utilizing `golang.org/x/crypto/bcrypt` with cost=12.
+- [ ] Implement `crypto.VerifyPassword(hash, password string) bool`.
+- [ ] Implement PAT generation: generate 40 random cryptographic bytes.
+- [ ] Format generated PAT as `ghp_{base58_encoded_bytes}` to mimic exact GitHub prefix formatting.
+- [ ] Hash PAT utilizing SHA256 before storing in the `access_tokens.token_hash` database column.
+- [ ] Implement OAuth2 Access Token generation formatted as `gho_{base58}`.
+- [ ] Implement Server-to-Server token generation formatted as `ghs_{base58}`.
+- [ ] Implement Refresh token generation formatted as `ghr_{base58}`.
+- [ ] Write `BasicAuthMiddleware` parser extracting standard `Authorization: Basic {base64}`.
+- [ ] Write `BearerAuthMiddleware` parser extracting standard `Authorization: Bearer {token}`.
+- [ ] Write token validation routing logic: if token starts with `ghp_`, query `access_tokens` table.
+- [ ] Inject `*models.User` pointer into `context.Context` upon successful token validation.
+- [ ] Implement `X-OAuth-Scopes` header generation based on database token scopes array.
+- [ ] Implement strict scope-checking function `RequireScope(ctx, scope string)` matching GitHub's `repo`, `admin:org`, `user:email` logic.
+- [ ] Implement cryptographic payload signing for Webhooks: compute HMAC SHA256 of POST body using user-provided secret.
+- [ ] Inject webhook signature into `X-Hub-Signature-256` header formatted as `sha256={hex_hmac}`.
+- [ ] Write AES-256-GCM encryption helper to securely encrypt sensitive database fields at rest (e.g., OAuth App client secrets, Webhook secrets).
+- [ ] Implement JWT parser for GitHub App authentication validating `RS256` signatures against configured App private keys.
+
+### 0.8 Object Modeling, Subsystem Routing, & API Base
+- [ ] Define `UserSerializer` struct mapping internal user to GitHub `{ "login": "...", "id": 1, "node_id": "...", "avatar_url": "..." }`.
+- [ ] Define `RepoSerializer` struct mapping internal repo to exact GitHub repository JSON object (over 100 specific fields).
+- [ ] Generate base64 GraphQL `node_id` strings (e.g., `MDEwOlJlcG9zaXRvcnkxMjk2MjY5` translates to `010:Repository1296269`).
+- [ ] Scaffold `GET /users/{username}` route controller calling `UserSerializer`.
+- [ ] Scaffold `GET /user` (authenticated user) route controller.
+- [ ] Scaffold `GET /repos/{owner}/{repo}` route controller calling `RepoSerializer`.
+- [ ] Scaffold `POST /user/repos` to handle repository creation API.
+- [ ] Scaffold Git LFS v2 routing: `POST /{owner}/{repo}.git/info/lfs/objects/batch`.
+- [ ] Implement LFS batch payload parser checking `operation` (upload/download).
+- [ ] Generate presigned URLs or local replica endpoints for LFS object transfer actions.
+- [ ] Define internal Job Queue interface `queue.WorkerPool`.
+- [ ] Define `queue.Task` struct: `Type`, `Payload`, `MaxRetries`.
+- [ ] Implement in-memory channel-based worker pool for single-binary asynchronous jobs (e.g., webhook delivery).
+- [ ] Map endpoint `GET /rate_limit` returning exact JSON limit breakdown per category.
+- [ ] Scaffold the `ghcr.io` OCI registry equivalent at `GET /v2/` mimicking Docker Registry HTTP API V2.
+- [ ] Return `Docker-Distribution-Api-Version: registry/2.0` on OCI base route.
+- [ ] Map GitHub Actions remote runner registration endpoint `POST /api/v3/actions/runners/register`.
+- [ ] Architect the search sub-router `GET /search/repositories` parsing the specific `?q=language:go+is:public` grammar syntax.
